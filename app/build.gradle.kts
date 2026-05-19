@@ -43,6 +43,38 @@ android {
 
 dependencies {
 
+    // Untuk icon tambahan seperti Sync, CloudUpload, EventNote, dan icon Compose lainnya.
+    implementation("androidx.compose.material:material-icons-extended")
+
+////Coil itu library untuk menampilkan gambar dari: URL internet,API, database ,link foto profile
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+// Untuk menghubungkan lifecycle Android dengan Jetpack Compose.
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+// Untuk menggunakan ViewModel langsung di Jetpack Compose.
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+
+// Untuk navigasi antar halaman/screen di Jetpack Compose.
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
+// Untuk menyimpan data sederhana seperti token login dan session user.
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+// Untuk menjalankan proses asynchronous/background di Kotlin.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+
+// Untuk melakukan request API ke backend/server.
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+
+// Untuk mengubah JSON API menjadi object Kotlin.
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+// Untuk HTTP client yang digunakan oleh Retrofit.
+    implementation("com.squareup.okhttp3:okhttp:4")
+
+
+
     // 1. Jetpack Navigation Compose (Untuk NavGraph & Routes)
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
@@ -63,6 +95,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.room3.external.antlr)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
