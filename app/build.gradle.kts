@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.hilt)  // ganti id() dengan alias
+    alias(libs.plugins.ksp)   // ganti id() dengan alias
 }
 
 android {
@@ -42,6 +44,12 @@ android {
 }
 
 dependencies {
+// Hilt core
+    implementation("com.google.dagger:hilt-android:2.51.1")
+    ksp("com.google.dagger:hilt-android-compiler:2.51.1") // ganti kapt dengan ksp
+    // Hilt + Navigation Compose (untuk hiltViewModel())
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
 
     // Untuk icon tambahan seperti Sync, CloudUpload, EventNote, dan icon Compose lainnya.
     implementation("androidx.compose.material:material-icons-extended")
