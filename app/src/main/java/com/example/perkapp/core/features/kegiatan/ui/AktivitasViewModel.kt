@@ -2,12 +2,8 @@ package com.example.perkapp.core.features.kegiatan.ui
 
 // Mengimpor kelas ViewModel dari Android Jetpack
 import androidx.lifecycle.ViewModel
-// Mengimpor anotasi HiltViewModel untuk inisialisasi ViewModel oleh Hilt
-import dagger.hilt.android.lifecycle.HiltViewModel
 // Mengimpor StateFlow, MutableStateFlow, dan fungsi pembantu update untuk manajemen state reaktif
 import kotlinx.coroutines.flow.*
-// Mengimpor anotasi Inject untuk menyuntikkan dependensi otomatis
-import javax.inject.Inject
 
 /**
  * UI State untuk menampung seluruh kondisi data dan status halaman Aktivitas.
@@ -30,16 +26,8 @@ data class AktivitasUiState(
 
 /**
  * AktivitasViewModel mengelola alur data searah (UDF) untuk halaman AktivitasScreen.
- * ViewModel ini dianotasi dengan @HiltViewModel agar di-inject otomatis oleh Hilt.
  */
-@HiltViewModel
-class AktivitasViewModel @Inject constructor(
-    // TODO: Uncomment setelah KegiatanRepository.kt di folder data/ selesai dibuat oleh tim
-    // private val repository: KegiatanRepository,
-
-    // TODO: Uncomment setelah NetworkMonitor.kt milik Adam siap digunakan
-    // private val networkMonitor: NetworkMonitor,
-) : ViewModel() {
+class AktivitasViewModel : ViewModel() {
 
     // _uiState menyimpan state UI secara private (mutable)
     private val _uiState = MutableStateFlow(AktivitasUiState())

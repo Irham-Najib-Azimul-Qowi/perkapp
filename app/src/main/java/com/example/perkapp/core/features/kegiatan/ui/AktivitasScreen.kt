@@ -22,8 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
-// Mengimpor modul integrasi ViewModel Hilt ke Compose
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
  * Enum status aktivitas yang membedakan tipe kondisi kegiatan.
@@ -48,7 +47,7 @@ data class Aktivitas(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AktivitasScreen(
-    viewModel: AktivitasViewModel = hiltViewModel(), // Injeksi otomatis menggunakan Hilt
+    viewModel: AktivitasViewModel = viewModel(),
     onTambahAktivitas: () -> Unit = {},
     onDetailAktivitas: (String) -> Unit = {},
 ) {
