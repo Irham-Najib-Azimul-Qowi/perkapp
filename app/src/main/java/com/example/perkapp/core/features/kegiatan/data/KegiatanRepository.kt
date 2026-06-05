@@ -3,6 +3,7 @@ package com.example.perkapp.features.kegiatan.data
 import com.example.perkapp.features.kegiatan.api.KegiatanApiService
 import com.example.perkapp.features.kegiatan.domain.InventoryStats
 import com.example.perkapp.features.kegiatan.domain.Kegiatan
+import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 import com.example.perkapp.features.kegiatan.domain.UserInfo
 import com.example.perkapp.features.kegiatan.mapper.toDomain
 import com.example.perkapp.features.kegiatan.mapper.toDomainList
@@ -96,6 +97,77 @@ class KegiatanRepositoryImpl(
     // Siang (12-17) → "Good Afternoon"
     // Malam (18-23) → "Good Evening"
     // ------------------------------------------------------------
+    private fun getSapaanBerdasarkanJam(): String {
+        val jam = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when {
+            jam < 12 -> "Good Morning"
+            jam < 18 -> "Good Afternoon"
+            else     -> "Good Evening"
+        }
+    }
+}
+
+// ============================================================
+// Fake/Mock Repository untuk pengujian halaman Home
+// ============================================================
+class FakeKegiatanRepository : KegiatanRepository {
+
+    // Mengembalikan data dummy statistik inventori secara langsung
+    override suspend fun getInventoryStats(): Result<InventoryStats> {
+        return Result.success(
+            InventoryStats(
+                borrowedCount = 5,       // 5 barang sedang dipinjam
+                availableCount = 28,     // 28 barang tersedia
+                pendingSyncCount = 1     // 1 barang menunda sinkronisasi
+            )
+        )
+    }
+
+    // Mengembalikan list dummy kegiatan yang sedang aktif secara langsung
+    override suspend fun getKegiatanAktif(): Result<List<Kegiatan>> {
+        return Result.success(
+            listOf(
+                Kegiatan(
+                    id = "101",
+                    kategori = "Research",
+                    judul = "Audit Fasilitas Hutan",
+                    lokasi = "Zona A - Sektor 3",
+                    labelWaktu = "Sisa 2 jam",
+                    progress = 0.7f,
+                    statusType = StatusKegiatan.AKTIF
+                ),
+                Kegiatan(
+                    id = "102",
+                    kategori = "Maintenance",
+                    judul = "Servis Panel Surya",
+                    lokasi = "Gedung Energi",
+                    labelWaktu = "Aktif",
+                    progress = 0.45f,
+                    statusType = StatusKegiatan.MAINTENANCE
+                ),
+                Kegiatan(
+                    id = "103",
+                    kategori = "Audit",
+                    judul = "Pengecekan Genset Utama",
+                    lokasi = "Gedung Genset",
+                    labelWaktu = "Baru Mulai",
+                    progress = 0.1f,
+                    statusType = StatusKegiatan.AUDIT
+                )
+            )
+        )
+    }
+
+    // Mengembalikan info user dummy beserta sapaan dinamis berdasarkan waktu
+    override suspend fun getUserInfo(): UserInfo {
+        return UserInfo(
+            nama = "Reja", // Nama diubah menjadi Reja sebagai pengguna saat ini
+            sapaan = getSapaanBerdasarkanJam(), // Memakai fungsi sapaan berbasis jam
+            fotoUrl = "" // Foto profil kosong
+        )
+    }
+
+    // Fungsi pembantu tambahan untuk menentukan sapaan berbasis jam saat ini
     private fun getSapaanBerdasarkanJam(): String {
         val jam = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return when {

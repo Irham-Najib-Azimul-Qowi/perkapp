@@ -1,85 +1,83 @@
 package com.example.perkapp.features.kegiatan.ui
 
+// Mengimpor kelas ViewModel dari Android Jetpack
 import androidx.lifecycle.ViewModel
+// Mengimpor ViewModelProvider untuk membuat instance ViewModel dengan parameter
 import androidx.lifecycle.ViewModelProvider
+// Mengimpor cakupan Coroutine (CoroutineScope) khusus untuk ViewModel
 import androidx.lifecycle.viewModelScope
+// Mengimpor interface KegiatanRepository dari lapisan data
 import com.example.perkapp.features.kegiatan.data.KegiatanRepository
+// Mengimpor data-data model domain yang digunakan oleh UI
 import com.example.perkapp.features.kegiatan.domain.HomeUiState
 import com.example.perkapp.features.kegiatan.domain.InventoryStats
 import com.example.perkapp.features.kegiatan.domain.UserInfo
+// Mengimpor fungsi pembantu async untuk menjalankan tugas secara paralel
 import kotlinx.coroutines.async
+// Mengimpor StateFlow dan MutableStateFlow untuk mengelola state secara reaktif
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+// Mengimpor launch untuk menjalankan coroutine baru tanpa memblokir thread
 import kotlinx.coroutines.launch
 
-// ============================================================
-// FILE: HomeViewModel.kt
-// LOKASI: features/kegiatan/ui/HomeViewModel.kt
-//         (ikut struktur Adam → ViewModel di folder ui/)
-//
-// FUNGSI: Lapisan VIEWMODEL dalam MVVM.
-//         Menghubungkan Repository (data) dengan HomeScreen (UI).
-//         Menyimpan state halaman Home sebagai StateFlow.
-// ============================================================
-
-
+/**
+ * HomeViewModel bertindak sebagai jembatan antara repositori data dan antarmuka pengguna (HomeScreen).
+ * ViewModel bertanggung jawab mempertahankan status (state) UI agar tidak hilang saat rotasi layar.
+ */
 class HomeViewModel(
-    // ViewModel menerima Repository lewat constructor
-    // Ini memudahkan testing dan penggantian sumber data
+    // Menerima dependency interface KegiatanRepository melalui constructor (untuk kemudahan testing)
     private val repository: KegiatanRepository
 ) : ViewModel() {
 
-    // ------------------------------------------------------------
-    // STATE MANAGEMENT
-    // _uiState → private, hanya ViewModel yang bisa ubah
-    //  uiState → public read-only, diobservasi oleh HomeScreen
-    // ------------------------------------------------------------
+    // _uiState bertipe MutableStateFlow, bersifat private agar isinya hanya bisa dimutasi di dalam kelas ini
     private val _uiState = MutableStateFlow(buatStateAwal())
+    // uiState bertipe StateFlow (read-only), diekspos ke luar agar bisa diamati secara pasif oleh HomeScreen
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-
-    // Dipanggil otomatis saat ViewModel pertama kali dibuat
+    // Blok inisialisasi awal yang dijalankan ketika pertama kali objek HomeViewModel diciptakan
     init {
+        // Otomatis memanggil fungsi untuk memuat data beranda saat mulai berjalan
         muatDataHome()
     }
 
-
-    // ------------------------------------------------------------
-    // FUNGSI: muatDataHome()
-    // Mengambil semua data Home secara paralel menggunakan async
-    // supaya lebih cepat dari pada request satu-satu (antri)
-    // ------------------------------------------------------------
+    /**
+     * Mengambil seluruh data kebutuhan halaman Home secara paralel agar waktu respons cepat.
+     */
     fun muatDataHome() {
+        // Meluncurkan coroutine di dalam lingkup daur hidup ViewModel
         viewModelScope.launch {
-            // Tampilkan loading dulu sebelum data datang
+            // Mengubah state ke posisi memuat (isLoading = true) dan mengosongkan pesan error sebelumnya
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
-            // Jalankan 3 request secara paralel
-            val statsDeferred    = async { repository.getInventoryStats() }
-            val kegiatanDeferred = async { repository.getKegiatanAktif() }
-            val userInfoDeferred = async { repository.getUserInfo() }
+            // Menggunakan async untuk memicu pemanggilan 3 fungsi data secara asinkron dan paralel
+            val statsDeferred    = async { repository.getInventoryStats() } // Mengambil data statistik barang
+            val kegiatanDeferred = async { repository.getKegiatanAktif() } // Mengambil daftar kegiatan aktif
+            val userInfoDeferred = async { repository.getUserInfo() } // Mengambil info user profil
 
-            // Tunggu semua selesai
+            // Menanti (await) hasil eksekusi dari masing-masing pemrosesan asinkron
             val statsResult    = statsDeferred.await()
             val kegiatanResult = kegiatanDeferred.await()
             val userInfo       = userInfoDeferred.await()
 
-            // Cek apakah ada yang error
+            // Jika salah satu dari pengambilan data inventaris atau kegiatan mengalami kegagalan
             if (statsResult.isFailure || kegiatanResult.isFailure) {
+                // Memperbarui state UI dengan mengubah loading menjadi selesai dan memasukkan pesan kesalahan
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = "Gagal memuat data. Periksa koneksi internet kamu."
                 )
+                // Keluar dari eksekusi coroutine
                 return@launch
             }
 
-            // Semua berhasil → update state dengan data dari API
+            // Jika semua proses di atas berhasil tanpa hambatan, perbarui data state UI utama
             _uiState.value = HomeUiState(
                 isLoading    = false,
-                isSynced     = true,
+                isSynced     = true, // Menandakan data sukses disinkronkan dengan backend
                 errorMessage = null,
                 userInfo     = userInfo,
+                // Mengambil nilai kembalian dari Result, jika kosong kembalikan nilai default kosong
                 inventoryStats = statsResult.getOrDefault(
                     InventoryStats(borrowedCount = 0, availableCount = 0, pendingSyncCount = 0)
                 ),
@@ -88,28 +86,34 @@ class HomeViewModel(
         }
     }
 
-
-    // Dipanggil saat user tekan tombol sync di header
+    /**
+     * Dipanggil saat user menekan ikon sinkronisasi di bar atas.
+     */
     fun onSyncDitekan() {
+        // Memuat ulang data beranda secara realtime
         muatDataHome()
     }
 
-    // Dipanggil saat tombol "Borrow Equipment" ditekan
-    // Navigasi ditangani di HomeScreen, ViewModel hanya handle logika
+    /**
+     * Dipanggil ketika tombol "Borrow Equipment" diklik.
+     */
     fun onPinjamAlatDitekan() {
-        // TODO: Tambah logika bisnis jika perlu (misal: cek izin user)
+        // Di sini bisa ditambahkan logika validasi izin peminjaman di masa mendatang
     }
 
-    // Dipanggil saat tombol "Log Activity" ditekan
+    /**
+     * Dipanggil ketika tombol "Log Activity" diklik.
+     */
     fun onCatatKegiatanDitekan() {
-        // TODO: Tambah logika bisnis jika perlu
+        // Di sini bisa diletakkan logika bisnis tambahan untuk pencatatan
     }
 
-
-    // State awal sebelum data dari API datang (supaya UI tidak crash)
+    /**
+     * Membuat objek representasi state awal sewaktu data belum berhasil dimuat.
+     */
     private fun buatStateAwal(): HomeUiState {
         return HomeUiState(
-            isLoading      = true,
+            isLoading      = true, // Default awal bernilai loading
             isSynced       = false,
             userInfo       = UserInfo(nama = "", sapaan = "", fotoUrl = ""),
             inventoryStats = InventoryStats(0, 0, 0),
@@ -117,20 +121,21 @@ class HomeViewModel(
         )
     }
 
-
-    // ------------------------------------------------------------
-    // FACTORY: Dibutuhkan karena ViewModel punya constructor parameter
-    // Cara pakai di HomeScreen:
-    //   val vm: HomeViewModel = viewModel(factory = HomeViewModelFactory(repo))
-    // ------------------------------------------------------------
+    /**
+     * Factory class yang digunakan untuk menginisialisasi HomeViewModel karena membutuhkan parameter
+     * pada constructor-nya (tidak bisa dibuat secara instan oleh Compose jika tanpa factory).
+     */
     class HomeViewModelFactory(
         private val repository: KegiatanRepository
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            // Memeriksa apakah modelClass yang diminta mewarisi kelas HomeViewModel
             if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
+                // Mengembalikan instance ViewModel dengan menyematkan KegiatanRepository
                 return HomeViewModel(repository) as T
             }
+            // Melempar error apabila tipe ViewModel tidak sesuai kelas target
             throw IllegalArgumentException("ViewModel tidak dikenal")
         }
     }
