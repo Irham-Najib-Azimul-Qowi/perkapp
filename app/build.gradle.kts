@@ -73,4 +73,9 @@ dependencies {
 
     implementation(libs.androidx.runtime.livedata)
     implementation(libs.androidx.navigation.compose)
+
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // WorkManager for offline sync
+    implementation(libs.work.runtime.ktx)
 }
