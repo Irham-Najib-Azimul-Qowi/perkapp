@@ -64,8 +64,8 @@ class AuthRepository(
                     name = request.name,
                     email = request.email,
                     password = request.password,
-                    role = "member",
-                    created_at = "2026-06-04" // Hardcode untuk mock
+                    role = "admin", // Diubah menjadi admin untuk testing
+                    created_at = "2026-06-05" // Hardcode untuk mock
                 )
                 
                 userDao.insertUser(newUser)
