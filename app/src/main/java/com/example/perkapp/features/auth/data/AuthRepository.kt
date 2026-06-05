@@ -89,4 +89,6 @@ class AuthRepository(
             userDao.clearUser()
         }
     }
+
+    fun getCurrentUser() = userDao.getUser()
 }

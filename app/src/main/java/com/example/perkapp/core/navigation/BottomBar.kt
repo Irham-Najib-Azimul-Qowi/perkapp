@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,7 +18,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 sealed class BottomNavItem(val route: String, val title: String, val icon: ImageVector) {
     object Home : BottomNavItem(Screen.Home.route, "Home", Icons.Default.Home)
     object Kegiatan : BottomNavItem(Screen.Kegiatan.route, "Kegiatan", Icons.Default.List)
-    object Inventaris : BottomNavItem(Screen.Inventaris.route, "Inventaris", Icons.Default.Settings)
+    object Profile : BottomNavItem(Screen.Profile.route, "Profil", Icons.Default.Person)
 }
 
 @Composable
@@ -25,7 +26,7 @@ fun BottomBar(navController: NavHostController) {
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Kegiatan,
-        BottomNavItem.Inventaris
+        BottomNavItem.Profile
     )
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()

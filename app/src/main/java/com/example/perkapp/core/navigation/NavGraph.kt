@@ -75,5 +75,17 @@ fun SetupNavGraph(
         composable(route = Screen.Kegiatan.route) {
             // Jika Kegiatan ada halamannya sendiri, taruh di sini
         }
+        composable(route = Screen.Profile.route) {
+            com.example.perkapp.features.auth.ui.ProfileScreen(
+                onLogoutSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) // Bersihkan semua backstack
+                    }
+                },
+                onNavigateToInventaris = {
+                    navController.navigate(Screen.Inventaris.route)
+                }
+            )
+        }
     }
 }

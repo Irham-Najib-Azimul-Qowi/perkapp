@@ -25,6 +25,8 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     private val _registerState = MutableStateFlow<AuthState>(AuthState.Idle)
     val registerState: StateFlow<AuthState> = _registerState.asStateFlow()
 
+    val currentUser = repository.getCurrentUser()
+
     fun login(request: LoginRequest) {
         viewModelScope.launch {
             _loginState.value = AuthState.Loading
