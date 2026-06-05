@@ -84,8 +84,23 @@ fun SetupNavGraph(
             )
         }
         composable(route = Screen.Inventaris.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val application = context.applicationContext as android.app.Application
+            val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
+            val alatApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.alat.api.AlatApiService::class.java)
+            val alatRepository = com.example.perkapp.features.alat.data.repository.AlatRepository(alatApi, db.alatDao(), context)
+            val alatViewModel: com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                factory = com.example.perkapp.features.alat.ui.viewmodel.AlatViewModelFactory(alatRepository, application)
+            )
+
             com.example.perkapp.features.alat.ui.screen.InventarisScreen(
-                // You might need to pass viewmodel and navigation callbacks here based on Najib's implementation
+                viewModel = alatViewModel,
+                onAddClick = {
+                    // TODO: Navigate to Add Inventaris Screen
+                },
+                onItemClick = { id ->
+                    // TODO: Navigate to Detail Inventaris Screen
+                }
             )
         }
         composable(route = Screen.Kegiatan.route) {
