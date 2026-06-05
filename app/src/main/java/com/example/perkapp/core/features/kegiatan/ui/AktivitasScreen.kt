@@ -1,34 +1,19 @@
 package com.example.perkapp.core.features.kegiatan.ui
 
-/**
- * AktivitasScreen.kt
- *
- * File ini adalah halaman utama "Aktivitas" yang tampil di navbar.
- * Berisi daftar semua aktivitas/kegiatan yang bisa dicari dan difilter.
- *
- * Struktur file ini:
- *  - Data Models  → definisi enum StatusAktivitas dan data class Aktivitas
- *  - AktivitasScreen → composable utama (root screen)
- *  - OfflineBanner → banner merah saat tidak ada koneksi internet
- *  - SearchFilterSection → kolom pencarian + filter chip status
- *  - FilterChipItem → tombol chip individual (Berlangsung / Selesai / Draft)
- *  - AktivitasCard → card satu aktivitas di dalam list
- *  - StatusBadge → label berwarna status di pojok kiri atas card
- *  - ProgressSection → progress bar persentase untuk aktivitas berlangsung
- *  - VerifiedBadge → label "Terverifikasi" untuk aktivitas selesai
- *  - DraftBadge → label "Belum dikirim" untuk aktivitas draft
- *  - EmptyAktivitasState → tampilan ketika list kosong
- */
-
+// Mengimpor modul-modul animasi Jetpack Compose untuk mendukung transisi UI yang halus
 import androidx.compose.animation.*
+// Mengimpor modul dasar layout, gestur, klik, scroll, dan penggambaran bentuk
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
+// Mengimpor koleksi ikon dasar Material Design
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+// Mengimpor elemen-elemen UI Material 3
 import androidx.compose.material3.*
+// Mengimpor library Compose Runtime untuk mengelola status (state)
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,131 +22,115 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+// Mengimpor modul integrasi ViewModel Hilt ke Compose
 import androidx.hilt.navigation.compose.hiltViewModel
 
-// =============================================================================
-// DATA MODELS
-// Mendefinisikan struktur data yang digunakan di halaman ini.
-// Nantinya pindahkan ke folder domain/ jika sudah terhubung ke API.
-// =============================================================================
-
 /**
- * Enum untuk status sebuah aktivitas.
- * - BERLANGSUNG : aktivitas sedang dikerjakan, tampil progress bar
- * - SELESAI     : aktivitas sudah selesai dan tersinkron
- * - DRAFT       : aktivitas belum dikirim ke server
+ * Enum status aktivitas yang membedakan tipe kondisi kegiatan.
  */
 enum class StatusAktivitas { BERLANGSUNG, SELESAI, DRAFT }
 
 /**
- * Data class yang merepresentasikan satu aktivitas/kegiatan.
- *
- * @param id       ID unik aktivitas (dari API/database)
- * @param judul    Nama/judul aktivitas yang ditampilkan di card
- * @param deskripsi Penjelasan singkat aktivitas
- * @param status   Status saat ini (lihat enum StatusAktivitas)
- * @param progress Persentase progres dalam bentuk float 0f–1f.
- *                 Contoh: 0.65f = 65%. Hanya dipakai jika status BERLANGSUNG.
- * @param tanggal  Teks tanggal yang ditampilkan di pojok kanan card
+ * Representasi data class kegiatan untuk halaman Aktivitas.
  */
 data class Aktivitas(
-    val id: String,
-    val judul: String,
-    val deskripsi: String,
-    val status: StatusAktivitas,
-    val progress: Float,
-    val tanggal: String,
+    val id: String, // ID unik kegiatan
+    val judul: String, // Judul nama kegiatan
+    val deskripsi: String, // Uraian pendek mengenai aktivitas
+    val status: StatusAktivitas, // Status pengerjaan saat ini
+    val progress: Float, // Progres pengerjaan (0.0f - 1.0f)
+    val tanggal: String, // Informasi tanggal atau status langsung
 )
 
-// =============================================================================
-// ROOT SCREEN
-// =============================================================================
-
 /**
- * Composable utama untuk halaman Aktivitas.
- * Dipanggil dari NavGraph.kt milik Adam ketika user tap menu "Aktivitas" di navbar.
- *
- * @param viewModel          ViewModel yang menyuplai data dan logika (di-inject otomatis oleh Hilt)
- * @param onTambahAktivitas  Callback navigasi ke halaman TambahKegiatanScreen
- * @param onDetailAktivitas  Callback navigasi ke halaman DetailKegiatanScreen, membawa ID aktivitas
+ * Composable utama (Root Screen) untuk menampilkan daftar Aktivitas/Kegiatan secara keseluruhan.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AktivitasScreen(
-    viewModel: AktivitasViewModel = hiltViewModel(),
+    viewModel: AktivitasViewModel = hiltViewModel(), // Injeksi otomatis menggunakan Hilt
     onTambahAktivitas: () -> Unit = {},
     onDetailAktivitas: (String) -> Unit = {},
 ) {
-    // Mengambil state terbaru dari ViewModel secara reaktif.
-    // Setiap kali uiState berubah di ViewModel, UI ini otomatis recompose.
+    // Mengamati UI state dari ViewModel secara reaktif
     val uiState by viewModel.uiState.collectAsState()
 
+    // Scaffold menyediakan struktur dasar halaman Material 3
     Scaffold(
-        // FAB tombol "+" di pojok kanan bawah untuk membuat aktivitas baru
         floatingActionButton = {
+            // Tombol melayang di pojok kanan bawah (+) berwarna hijau cerah dengan ikon plus hitam
             FloatingActionButton(
-                onClick = onTambahAktivitas,
-                shape = RoundedCornerShape(16.dp),
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onTambahAktivitas, // Callback tombol diklik
+                shape = CircleShape, // Bentuk bulat sempurna sesuai gambar
+                containerColor = Color(0xFF22C55E), // Hijau cerah sesuai gambar
+                contentColor = Color.Black, // Warna ikon plus hitam sesuai gambar
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Tambah Aktivitas")
+                // Ikon tambah "+" bawaan Material Icons
+                Icon(Icons.Default.Add, contentDescription = "Add Activity")
             }
         }
-    ) { innerPadding ->
+    ) { innerPadding -> // Menampung padding Scaffold secara aman agar konten tidak tertutup
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                // innerPadding memastikan konten tidak tertutup FAB atau system bar
-                .padding(innerPadding)
+                .fillMaxSize() // Memenuhi layar
+                .background(Color(0xFFF8F9FF)) // Latar belakang abu-biru sangat muda
+                .padding(innerPadding) // Padding otomatis
         ) {
-            // Banner offline muncul/hilang dengan animasi slide vertikal.
-            // AnimatedVisibility akan render OfflineBanner hanya jika isOffline = true.
+            // Menampilkan banner offline dengan animasi geser turun/naik jika status isOffline aktif
             AnimatedVisibility(
                 visible = uiState.isOffline,
-                enter = expandVertically(),  // animasi muncul dari atas ke bawah
-                exit = shrinkVertically(),   // animasi hilang dari bawah ke atas
+                enter = expandVertically(), // Animasi muncul secara vertikal
+                exit = shrinkVertically(), // Animasi menyusut vertikal saat offline berakhir
             ) {
+                // Merender komponen banner penanda offline
                 OfflineBanner()
             }
 
-            // LazyColumn = RecyclerView di Compose.
-            // Hanya merender item yang terlihat di layar, lebih efisien untuk list panjang.
+            // LazyColumn bertindak layaknya RecyclerView (merender item yang tampak di layar saja secara efisien)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     end = 20.dp,
-                    top = 12.dp,
-                    bottom = 100.dp, // padding bawah agar card terakhir tidak tertutup navbar
+                    top = 20.dp,
+                    bottom = 100.dp, // Jarak padding bawah agar kartu terakhir tidak tertutupi
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp), // jarak antar item
+                verticalArrangement = Arrangement.spacedBy(16.dp), // Mengatur jarak antar item list 16.dp
             ) {
-                // Item pertama di list adalah section search + filter chip
+                // Item pertama adalah header judul utama "SIEPERKAP"
                 item {
-                    SearchFilterSection(
-                        query = uiState.searchQuery,
-                        onQueryChange = viewModel::onSearchQueryChange,
-                        activeFilter = uiState.activeFilter,
-                        onFilterChange = viewModel::onFilterChange,
+                    Text(
+                        text = "SIEPERKAP",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF006E2F), // Warna hijau utama
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
 
-                // Cek apakah list kosong setelah filter diterapkan
+                // Komponen kedua berupa kolom pencarian dan filter chip status
+                item {
+                    SearchFilterSection(
+                        query = uiState.searchQuery, // String pencarian saat ini
+                        onQueryChange = viewModel::onSearchQueryChange, // Memicu pencarian ulang saat mengetik
+                        activeFilter = uiState.activeFilter, // Status filter yang aktif
+                        onFilterChange = viewModel::onFilterChange, // Mengganti status filter
+                    )
+                }
+
+                // Mengecek apabila list aktivitas yang difilter kosong
                 if (uiState.aktivitasList.isEmpty()) {
-                    // Tampilkan ilustrasi kosong
+                    // Merender visualisasi kosong (Empty State)
                     item { EmptyAktivitasState() }
                 } else {
-                    // Render setiap aktivitas sebagai card.
-                    // key = { it.id } membantu Compose mengidentifikasi item saat ada
-                    // perubahan (insert, delete, reorder) agar animasi lebih smooth.
+                    // Merender masing-masing card aktivitas menggunakan items() secara efisien
                     items(
                         items = uiState.aktivitasList,
-                        key = { it.id },
+                        key = { it.id }, // Memberikan key unik agar perombakan posisi list lebih cepat di-render
                     ) { aktivitas ->
                         AktivitasCard(
                             aktivitas = aktivitas,
-                            // Saat card di-tap, navigasi ke detail dengan membawa ID
+                            // Memicu aksi navigasi ke detail saat kartu di-tap dengan membawa ID
                             onClick = { onDetailAktivitas(aktivitas.id) },
                         )
                     }
@@ -171,53 +140,38 @@ fun AktivitasScreen(
     }
 }
 
-// =============================================================================
-// OFFLINE BANNER
-// =============================================================================
-
 /**
- * Banner merah yang muncul di bagian atas layar saat koneksi internet terputus.
- * Menampilkan icon cloud_off + teks peringatan.
- * Dipanggil dari AktivitasScreen dengan AnimatedVisibility.
+ * Banner penanda koneksi internet offline yang berwarna merah kontras.
  */
 @Composable
 private fun OfflineBanner() {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .fillMaxWidth() // Lebar penuh
+            .background(MaterialTheme.colorScheme.errorContainer) // Latar kontainer error merah
+            .padding(horizontal = 16.dp, vertical = 10.dp), // Padding dalam
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
+        // Ikon awan terputus/off
         Icon(
             imageVector = Icons.Outlined.CloudOff,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onErrorContainer,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(8.dp)) // Jarak spasi horizontal
+        // Teks deskripsi info offline
         Text(
-            text = "Offline – perubahan akan disinkronkan otomatis",
+            text = "Offline – changes will be synced automatically",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onErrorContainer,
         )
     }
 }
 
-// =============================================================================
-// SEARCH & FILTER SECTION
-// =============================================================================
-
 /**
- * Bagian atas list yang berisi:
- * 1. TextField untuk mencari aktivitas berdasarkan judul/deskripsi
- * 2. Baris chip untuk memfilter berdasarkan status (Berlangsung / Selesai / Draft)
- *
- * @param query         Nilai teks pencarian saat ini (dari uiState)
- * @param onQueryChange Dipanggil setiap kali user mengetik di search bar
- * @param activeFilter  Filter status yang sedang aktif. null = tampilkan semua.
- * @param onFilterChange Dipanggil saat user tap chip filter
+ * Baris pencarian teks (English) dan filter chip status pengerjaan (In Progress / Completed).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -227,63 +181,60 @@ private fun SearchFilterSection(
     activeFilter: StatusAktivitas?,
     onFilterChange: (StatusAktivitas?) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
-        // ── Search Bar ────────────────────────────────────────────────────────
-        // OutlinedTextField dengan border transparan agar terlihat seperti filled field.
-        // Border hanya muncul (warna primaryContainer) saat field sedang difokus.
+        // Kolom input pencarian (TextField) dengan ikon kaca pembesar berbahasa Inggris
         OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
+            value = query, // Mengikat teks pencarian
+            onValueChange = onQueryChange, // Pemicu perubahan teks saat diketik
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             placeholder = {
+                // Teks petunjuk input bahasa Inggris sesuai gambar
                 Text(
-                    "Cari aktivitas...",
+                    "Search activities...",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.outline,
                 )
             },
             leadingIcon = {
-                // Icon kaca pembesar di sisi kiri field
+                // Ikon pencarian di kiri input
                 Icon(
                     Icons.Default.Search,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.outline,
                 )
             },
-            singleLine = true, // cegah field bisa multi-baris
-            shape = RoundedCornerShape(12.dp),
+            singleLine = true, // Mengunci input hanya satu baris saja
+            shape = RoundedCornerShape(28.dp), // Membuat ujung melingkar penuh (capsule) sesuai gambar
             colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                unfocusedBorderColor = Color.Transparent, // border hilang saat tidak fokus
-                focusedBorderColor = MaterialTheme.colorScheme.primaryContainer,
+                unfocusedContainerColor = Color(0xFFEFF4FF), // Latar belakang biru-abu sangat muda sesuai gambar
+                focusedContainerColor = Color(0xFFEFF4FF),
+                unfocusedBorderColor = Color.Transparent, // Border transparan saat tidak difokus
+                focusedBorderColor = Color(0xFF006E2F), // Border berwarna hijau saat aktif
             ),
         )
 
-        // ── Filter Chips ──────────────────────────────────────────────────────
-        // horizontalScroll memungkinkan chip di-scroll ke kanan jika tidak muat di layar
+        // Baris gulir horizontal berisi tombol filter chip (hanya In Progress & Completed)
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            modifier = Modifier.horizontalScroll(rememberScrollState()), // Aktif scroll ke samping
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Chip "Berlangsung" — tap lagi untuk deselect (toggle behavior)
+            // Chip status: In Progress
             FilterChipItem(
-                label = "Berlangsung",
+                label = "In Progress",
                 selected = activeFilter == StatusAktivitas.BERLANGSUNG,
                 onClick = {
-                    // Jika chip ini sudah aktif → hapus filter (null = tampilkan semua)
-                    // Jika belum aktif → aktifkan filter ini
                     onFilterChange(
                         if (activeFilter == StatusAktivitas.BERLANGSUNG) null
                         else StatusAktivitas.BERLANGSUNG
                     )
                 },
             )
+            // Chip status: Completed
             FilterChipItem(
-                label = "Selesai",
+                label = "Completed",
                 selected = activeFilter == StatusAktivitas.SELESAI,
                 onClick = {
                     onFilterChange(
@@ -292,27 +243,12 @@ private fun SearchFilterSection(
                     )
                 },
             )
-            FilterChipItem(
-                label = "Draft",
-                selected = activeFilter == StatusAktivitas.DRAFT,
-                onClick = {
-                    onFilterChange(
-                        if (activeFilter == StatusAktivitas.DRAFT) null
-                        else StatusAktivitas.DRAFT
-                    )
-                },
-            )
         }
     }
 }
 
 /**
- * Satu tombol chip filter berbentuk pill (kapsul).
- * Warna berubah antara "aktif" (secondaryContainer) dan "nonaktif" (surfaceContainerHigh).
- *
- * @param label    Teks yang ditampilkan di dalam chip
- * @param selected true jika chip ini sedang aktif/dipilih
- * @param onClick  Aksi saat chip di-tap
+ * Item filter individual berbentuk kapsul pill.
  */
 @Composable
 private fun FilterChipItem(
@@ -320,23 +256,23 @@ private fun FilterChipItem(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    // Warna background chip berubah berdasarkan kondisi selected
+    // Penyesuaian warna latar belakang berdasarkan terpilih (selected) atau tidak
     val containerColor = if (selected)
-        MaterialTheme.colorScheme.secondaryContainer  // hijau muda saat aktif
+        Color(0xFF7CF994) // Hijau muda cerah saat dipilih sesuai gambar
     else
-        MaterialTheme.colorScheme.surfaceContainerHigh // abu-abu saat nonaktif
+        Color(0xFFD9E3F6) // Abu-biru muda saat pasif sesuai gambar
 
-    // Warna teks chip juga menyesuaikan agar kontras dengan background
+    // Penyesuaian warna teks agar kontras dengan warna latar belakang chip
     val textColor = if (selected)
-        MaterialTheme.colorScheme.onSecondaryContainer
+        Color(0xFF007230) // Hijau tua saat terpilih
     else
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color(0xFF3D4A3D) // Abu-abu gelap saat pasif
 
     Box(
         modifier = Modifier
-            .clip(CircleShape)           // bentuk pill/kapsul
+            .clip(CircleShape) // Memotong dengan bentuk kapsul melingkar
             .background(containerColor)
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick) // Menangani interaksi tap user
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -344,40 +280,27 @@ private fun FilterChipItem(
             text = label,
             style = MaterialTheme.typography.labelLarge,
             color = textColor,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
 
-// =============================================================================
-// AKTIVITAS CARD
-// =============================================================================
-
 /**
- * Card yang menampilkan satu aktivitas dalam list.
- * Desain mengikuti HTML asli: ada garis aksen warna di sisi kiri card (border-l-4).
- *
- * Warna garis kiri:
- *  - BERLANGSUNG → primary (hijau)
- *  - SELESAI     → outline (abu-abu), card sedikit transparan
- *  - DRAFT       → error (merah)
- *
- * @param aktivitas Data aktivitas yang akan ditampilkan
- * @param onClick   Dipanggil saat user tap card → navigasi ke DetailKegiatanScreen
+ * Card komponen visual representasi dari satu kegiatan aktivitas.
  */
 @Composable
 fun AktivitasCard(
     aktivitas: Aktivitas,
     onClick: () -> Unit,
 ) {
-    // Tentukan warna garis aksen kiri berdasarkan status
+    // Menentukan warna aksen garis vertikal di pojok kiri berdasarkan status
     val borderColor = when (aktivitas.status) {
-        StatusAktivitas.BERLANGSUNG -> MaterialTheme.colorScheme.primary
-        StatusAktivitas.SELESAI     -> MaterialTheme.colorScheme.outline
-        StatusAktivitas.DRAFT       -> MaterialTheme.colorScheme.error
+        StatusAktivitas.BERLANGSUNG -> Color(0xFF006E2F) // Hijau untuk berlangsung
+        StatusAktivitas.SELESAI     -> Color(0xFF6D7B6C) // Abu-abu untuk selesai
+        StatusAktivitas.DRAFT       -> Color(0xFF6D7B6C) // Abu-abu untuk draf
     }
 
-    // Card aktivitas selesai dibuat sedikit transparan (opacity 80%)
-    // untuk memberi kesan "sudah tidak aktif"
+    // Mengurangi kepekatan (opacity) card bernilai selesai menjadi 90% sebagai indikator pasif
     val isCompleted = aktivitas.status == StatusAktivitas.SELESAI
 
     Card(
@@ -385,18 +308,21 @@ fun AktivitasCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                // graphicsLayer(alpha) mengubah transparansi seluruh card
-                if (isCompleted) Modifier.graphicsLayer(alpha = 0.8f) else Modifier
+                if (isCompleted) Modifier.graphicsLayer(alpha = 0.9f) else Modifier
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp), // Sudut membulat lebar sesuai gambar
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.White, // Latar belakang putih bersih
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min) // Membuat tinggi Row mengikuti isi konten secara dinamis
+        ) {
 
-            // Garis aksen vertikal di sisi kiri card (mengikuti border-l-4 di HTML)
+            // Garis pembatas aksen vertikal kiri berwarna (seperti border-l-4 di CSS)
             Box(
                 modifier = Modifier
                     .width(4.dp)
@@ -404,14 +330,14 @@ fun AktivitasCard(
                     .background(borderColor)
             )
 
-            // Konten utama card (status badge, judul, deskripsi, progress/badge)
+            // Area layout teks utama dalam kartu
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // Baris atas: status badge di kiri, tanggal di kanan
+                // Baris atas: Status badge di kiri, tanggal/label waktu di kanan
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -420,37 +346,40 @@ fun AktivitasCard(
                     StatusBadge(status = aktivitas.status)
                     Text(
                         text = aktivitas.tanggal,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF6D7B6C), // Warna teks abu-abu sesuai gambar
                     )
                 }
 
-                // Judul aktivitas
+                // Menampilkan nama judul aktivitas
                 Text(
                     text = aktivitas.judul,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color(0xFF121C2A), // Biru gelap kehitaman
+                    fontWeight = FontWeight.Bold
                 )
 
-                // Deskripsi singkat aktivitas
+                // Menampilkan deskripsi singkat aktivitas
                 Text(
                     text = aktivitas.deskripsi,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF3D4A3D),
                 )
 
-                // Bagian bawah card berbeda tergantung status:
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Mengatur tampilan bagian bawah kartu secara adaptif bergantung status aktivitas
                 when (aktivitas.status) {
                     StatusAktivitas.BERLANGSUNG -> {
-                        // Tampilkan progress bar dengan persentase
+                        // Menampilkan section progress bar persentase
                         ProgressSection(progress = aktivitas.progress)
                     }
                     StatusAktivitas.SELESAI -> {
-                        // Tampilkan label "Terverifikasi & Tersinkron"
+                        // Menampilkan badge hijau terverifikasi
                         VerifiedBadge()
                     }
                     StatusAktivitas.DRAFT -> {
-                        // Tampilkan label "Belum dikirim"
+                        // Menampilkan draf badge
                         DraftBadge()
                     }
                 }
@@ -460,29 +389,26 @@ fun AktivitasCard(
 }
 
 /**
- * Label pill berwarna di pojok kiri atas card yang menunjukkan status aktivitas.
- * Warna background dan teks otomatis menyesuaikan berdasarkan status.
- *
- * @param status Status aktivitas yang menentukan warna dan teks label
+ * Status Badge berbentuk kapsul kecil untuk menyorot status pengerjaan kegiatan (English).
  */
 @Composable
 private fun StatusBadge(status: StatusAktivitas) {
-    // Destructuring Triple: ambil label, warna background, dan warna teks sekaligus
+    // Destructuring Triple: Menentukan warna latar, warna teks, dan teks label bahasa Inggris sesuai gambar
     val (label, containerColor, contentColor) = when (status) {
         StatusAktivitas.BERLANGSUNG -> Triple(
-            "Berlangsung",
-            MaterialTheme.colorScheme.secondaryContainer,    // hijau muda
-            MaterialTheme.colorScheme.onSecondaryContainer,
+            "In Progress",
+            Color(0xFF7CF994), // Hijau muda cerah sesuai gambar
+            Color(0xFF007230),
         )
         StatusAktivitas.SELESAI -> Triple(
-            "Selesai",
-            MaterialTheme.colorScheme.surfaceContainerHighest, // abu-abu
-            MaterialTheme.colorScheme.onSurfaceVariant,
+            "Completed",
+            Color(0xFFEFF4FF), // Biru-abu sangat muda sesuai gambar
+            Color(0xFF3D4A3D),
         )
         StatusAktivitas.DRAFT -> Triple(
             "Draft",
-            MaterialTheme.colorScheme.errorContainer,          // merah muda
-            MaterialTheme.colorScheme.onErrorContainer,
+            Color(0xFFEFF4FF),
+            Color(0xFF3D4A3D),
         )
     }
 
@@ -496,20 +422,17 @@ private fun StatusBadge(status: StatusAktivitas) {
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
 
 /**
- * Progress bar yang ditampilkan di bawah deskripsi untuk aktivitas berstatus BERLANGSUNG.
- * Menampilkan label "Progress" di kiri dan persentase (misal "65%") di kanan,
- * diikuti LinearProgressIndicator berbentuk pill.
- *
- * @param progress Nilai float 0f–1f. Akan dikonversi ke persen untuk ditampilkan.
+ * Menampilkan baris tingkat progres dalam bentuk bar persentase (English).
  */
 @Composable
 private fun ProgressSection(progress: Float) {
-    // Konversi float ke integer persen untuk teks (0.65f → 65)
+    // Mengonversi nilai progres pecahan ke satuan persen bilangan bulat (contoh: 0.65f -> 65)
     val progressPercent = (progress * 100).toInt()
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -519,110 +442,103 @@ private fun ProgressSection(progress: Float) {
         ) {
             Text(
                 text = "Progress",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF3D4A3D),
             )
             Text(
                 text = "$progressPercent%",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF121C2A),
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        // Progress bar Material 3 dengan clip CircleShape agar ujungnya membulat
+        // Indikator linear progres M3 dengan ujung melingkar
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
                 .clip(CircleShape),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = Color(0xFF006E2F), // Warna hijau utama progres sesuai gambar
+            trackColor = Color(0xFFEFF4FF), // Latar belakang bar abu-biru sesuai gambar
         )
     }
 }
 
 /**
- * Badge yang muncul di bagian bawah card untuk aktivitas berstatus SELESAI.
- * Menampilkan icon centang hijau + teks "Terverifikasi & Tersinkron".
+ * Badge penanda status terverifikasi (Selesai).
  */
 @Composable
 private fun VerifiedBadge() {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        // Ikon centang bulat berwarna hijau
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = Color(0xFF006E2F), // Hijau utama sesuai gambar
             modifier = Modifier.size(20.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = "Terverifikasi & Tersinkron",
+            text = "Verified & Synced", // Bahasa Inggris sesuai gambar
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            color = Color(0xFF006E2F),
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
 
 /**
- * Badge yang muncul di bagian bawah card untuk aktivitas berstatus DRAFT.
- * Menampilkan icon edit merah + teks "Belum dikirim".
- * Mengindikasikan aktivitas belum tersimpan ke server.
+ * Badge penanda status draf (Draft).
  */
 @Composable
 private fun DraftBadge() {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        // Ikon kertas pensil (Edit Note) berwarna abu-abu
         Icon(
             imageVector = Icons.Outlined.EditNote,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
+            tint = Color(0xFF6D7B6C),
             modifier = Modifier.size(20.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = "Belum dikirim",
+            text = "Draft",
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.error,
+            color = Color(0xFF6D7B6C),
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
 
-// =============================================================================
-// EMPTY STATE
-// =============================================================================
-
 /**
- * Tampilan pengganti list ketika tidak ada aktivitas yang ditemukan.
- * Muncul dalam dua kondisi:
- *  1. Belum ada aktivitas sama sekali
- *  2. Hasil pencarian/filter tidak menemukan data yang cocok
- *
- * Menampilkan icon besar + dua baris teks panduan.
+ * Menampilkan ilustrasi dan petunjuk teks ketika list kegiatan kosong/tidak cocok dengan filter.
  */
 @Composable
 private fun EmptyAktivitasState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 64.dp), // beri jarak dari atas agar terasa "di tengah layar"
+            .padding(top = 64.dp), // Menggeser jarak ke bawah agar visual seimbang di tengah
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Icon besar sebagai ilustrasi visual
+        // Ikon berkas catatan aktivitas berukuran besar
         Icon(
             imageVector = Icons.Outlined.EventNote,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.outline,
         )
+        // Informasi utama list kosong (Bahasa Inggris)
         Text(
-            text = "Belum ada aktivitas",
+            text = "No activities found",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        // Teks panduan untuk user agar tahu cara menambah aktivitas
+        // Arahan aksi untuk mereset filter
         Text(
-            text = "Tap tombol + untuk menambahkan aktivitas baru",
+            text = "Try searching for another keyword or change filters.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
         )

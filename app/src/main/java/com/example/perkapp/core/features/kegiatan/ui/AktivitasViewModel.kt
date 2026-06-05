@@ -1,41 +1,23 @@
 package com.example.perkapp.core.features.kegiatan.ui
 
-/**
- * AktivitasViewModel.kt
- *
- * ViewModel untuk halaman AktivitasScreen.
- * Bertanggung jawab atas:
- *  - Menyimpan dan mengekspos UI state ke AktivitasScreen
- *  - Logika pencarian (search) berdasarkan judul dan deskripsi
- *  - Logika filter berdasarkan StatusAktivitas
- *  - (Nanti) Mengambil data dari KegiatanRepository
- *  - (Nanti) Mendeteksi status koneksi dari NetworkMonitor milik Adam
- *
- * Pola yang digunakan: UDF (Unidirectional Data Flow)
- *  Screen → event → ViewModel → update state → Screen recompose
- */
-
+// Mengimpor kelas ViewModel dari Android Jetpack
 import androidx.lifecycle.ViewModel
+// Mengimpor anotasi HiltViewModel untuk inisialisasi ViewModel oleh Hilt
 import dagger.hilt.android.lifecycle.HiltViewModel
+// Mengimpor StateFlow, MutableStateFlow, dan fungsi pembantu update untuk manajemen state reaktif
 import kotlinx.coroutines.flow.*
+// Mengimpor anotasi Inject untuk menyuntikkan dependensi otomatis
 import javax.inject.Inject
 
-// =============================================================================
-// UI STATE
-// Satu data class yang menjadi "sumber kebenaran tunggal" untuk AktivitasScreen.
-// Semua yang perlu diketahui UI ada di sini.
-// =============================================================================
-
 /**
- * Representasi lengkap state UI halaman Aktivitas.
- * AktivitasScreen hanya membaca dari sini, tidak menyimpan state sendiri.
+ * UI State untuk menampung seluruh kondisi data dan status halaman Aktivitas.
  *
- * @param aktivitasList  Daftar aktivitas yang sudah difilter, siap ditampilkan di list
- * @param isLoading      true saat data sedang dimuat (untuk tampilkan loading spinner)
- * @param isOffline      true saat tidak ada koneksi internet → tampilkan OfflineBanner
- * @param searchQuery    Teks pencarian yang sedang diketik user di search bar
- * @param activeFilter   Filter status yang aktif. null berarti tampilkan semua status.
- * @param errorMessage   Pesan error jika ada gagal load, ditampilkan sebagai snackbar/toast
+ * @param aktivitasList List aktivitas yang saat ini ditampilkan setelah filter
+ * @param isLoading Menandakan proses pemuatan sedang berlangsung atau selesai
+ * @param isOffline Menandakan koneksi internet terputus
+ * @param searchQuery Kata pencarian yang diketik user
+ * @param activeFilter Filter status yang aktif
+ * @param errorMessage Pesan kesalahan jika terjadi kegagalan pemuatan data
  */
 data class AktivitasUiState(
     val aktivitasList: List<Aktivitas> = emptyList(),
@@ -46,151 +28,122 @@ data class AktivitasUiState(
     val errorMessage: String? = null,
 )
 
-// =============================================================================
-// VIEWMODEL
-// =============================================================================
-
 /**
- * @HiltViewModel → Hilt akan otomatis membuat dan meng-inject ViewModel ini.
- * Tidak perlu buat ViewModelFactory manual.
- *
- * @Inject constructor → Hilt akan mengisi parameter constructor secara otomatis.
- * Tambahkan dependency (Repository, NetworkMonitor, dll) di sini saat sudah siap.
+ * AktivitasViewModel mengelola alur data searah (UDF) untuk halaman AktivitasScreen.
+ * ViewModel ini dianotasi dengan @HiltViewModel agar di-inject otomatis oleh Hilt.
  */
 @HiltViewModel
 class AktivitasViewModel @Inject constructor(
-    // TODO: Uncomment setelah KegiatanRepository.kt di folder data/ selesai dibuat
+    // TODO: Uncomment setelah KegiatanRepository.kt di folder data/ selesai dibuat oleh tim
     // private val repository: KegiatanRepository,
 
     // TODO: Uncomment setelah NetworkMonitor.kt milik Adam siap digunakan
     // private val networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
-    // _uiState adalah MutableStateFlow yang hanya bisa diubah di dalam ViewModel (private)
+    // _uiState menyimpan state UI secara private (mutable)
     private val _uiState = MutableStateFlow(AktivitasUiState())
-
-    // uiState adalah versi read-only yang di-expose ke AktivitasScreen (public)
-    // Screen hanya bisa membaca, tidak bisa mengubah langsung → mencegah bug
+    // uiState mengekspos state UI secara read-only (public) ke halaman AktivitasScreen
     val uiState: StateFlow<AktivitasUiState> = _uiState.asStateFlow()
 
-    /**
-     * Menyimpan semua aktivitas mentah SEBELUM filter/search diterapkan.
-     * Filter bekerja dengan memfilter list ini lalu hasilnya dimasukkan ke uiState.aktivitasList.
-     * Dengan cara ini, saat filter dilepas, data asli tidak hilang.
-     */
+    // _allAktivitas menyimpan sumber data asli kegiatan sebelum filter diterapkan
     private val _allAktivitas = MutableStateFlow<List<Aktivitas>>(emptyList())
 
-    // init {} dipanggil otomatis saat ViewModel pertama kali dibuat
+    // Dijalankan otomatis saat pertama kali class AktivitasViewModel di-instantiate
     init {
-        // Saat ini pakai data dummy dulu agar UI bisa dicoba tanpa API
-        // Ganti loadDummyData() dengan loadAktivitas() setelah repository siap
+        // Memuat data dummy untuk keperluan development UI
         loadDummyData()
 
-        // TODO: Aktifkan ini setelah NetworkMonitor dari Adam sudah bisa dipakai
+        // TODO: Aktifkan observasi jaringan setelah NetworkMonitor dari Adam sudah di-merge
         // observeNetwork()
     }
 
-    // =========================================================================
-    // PUBLIC ACTIONS
-    // Fungsi-fungsi ini dipanggil dari AktivitasScreen sebagai respons aksi user
-    // =========================================================================
-
     /**
-     * Dipanggil setiap kali user mengetik di search bar.
-     * Memperbarui searchQuery di state lalu menerapkan ulang filter.
+     * Dipanggil setiap kali terjadi perubahan input teks pencarian oleh user.
      *
-     * @param query Teks terbaru dari search bar
+     * @param query Teks terbaru di bar pencarian
      */
     fun onSearchQueryChange(query: String) {
+        // Memperbarui properti searchQuery di dalam UI State
         _uiState.update { it.copy(searchQuery = query) }
-        applyFilter() // terapkan filter dengan query baru
+        // Menerapkan filter gabungan (pencarian + status)
+        applyFilter()
     }
 
     /**
-     * Dipanggil saat user tap chip filter (Berlangsung / Selesai / Draft).
-     * Jika filter yang sama di-tap lagi, nilainya null (tampilkan semua).
+     * Dipanggil sewaktu pengguna menekan salah satu chip filter status (Berlangsung/Selesai/Draft).
      *
-     * @param filter Status yang dipilih, atau null untuk hapus filter
+     * @param filter StatusAktivitas yang dipilih, atau null untuk menghapus filter status
      */
     fun onFilterChange(filter: StatusAktivitas?) {
+        // Memperbarui properti activeFilter di dalam UI State
         _uiState.update { it.copy(activeFilter = filter) }
-        applyFilter() // terapkan filter dengan status baru
+        // Menerapkan kembali filter gabungan
+        applyFilter()
     }
 
     /**
-     * Dipanggil saat user melakukan pull-to-refresh.
-     * TODO: Ganti loadDummyData() dengan sinkronisasi ke server via repository
+     * Dipanggil ketika pengguna memicu pembaruan data (misalnya geser layar ke bawah / pull to refresh).
      */
     fun refresh() {
-        // TODO: panggil repository.syncAktivitas() untuk ambil data terbaru dari API
+        // TODO: Ganti ke pemanggilan repository.syncAktivitas() jika API siap digunakan
         loadDummyData()
     }
 
-    // =========================================================================
-    // PRIVATE HELPERS
-    // Logika internal ViewModel, tidak perlu diketahui oleh Screen
-    // =========================================================================
-
     /**
-     * Menerapkan filter pencarian dan filter status ke _allAktivitas,
-     * lalu memasukkan hasilnya ke uiState.aktivitasList.
-     *
-     * Logika filter:
-     *  - searchQuery kosong → semua aktivitas lolos filter teks
-     *  - activeFilter null → semua status lolos filter status
-     *  - Keduanya AND: aktivitas harus memenuhi kedua kondisi sekaligus
+     * Menyaring daftar kegiatan asli (_allAktivitas) berdasarkan input teks pencarian dan filter status.
+     * Hasil saringan disimpan ke properti aktivitasList pada uiState agar UI me-render ulang secara otomatis.
      */
     private fun applyFilter() {
+        // Mengambil snapshot dari state saat ini
         val state = _uiState.value
+        // Menyaring data list kegiatan asli
         val filtered = _allAktivitas.value
             .filter { aktivitas ->
-                // Cek apakah judul atau deskripsi mengandung teks pencarian
-                // ignoreCase = true agar "audit" bisa menemukan "Audit"
+                // Memeriksa apakah kolom pencarian kosong, atau judul/deskripsi mengandung teks pencarian (case-insensitive)
                 val matchQuery = state.searchQuery.isBlank() ||
                         aktivitas.judul.contains(state.searchQuery, ignoreCase = true) ||
                         aktivitas.deskripsi.contains(state.searchQuery, ignoreCase = true)
 
-                // Cek apakah status aktivitas sesuai filter yang dipilih
+                // Memeriksa apakah filter status non-aktif (null), atau status kegiatan cocok dengan filter aktif
                 val matchFilter = state.activeFilter == null ||
                         aktivitas.status == state.activeFilter
 
-                // Aktivitas lolos hanya jika memenuhi keduanya
+                // Data lolos saringan hanya jika memenuhi kriteria pencarian AND kriteria filter status
                 matchQuery && matchFilter
             }
 
-        // Update state dengan list yang sudah difilter
+        // Memperbarui list aktivitas yang siap ditayangkan di UI
         _uiState.update { it.copy(aktivitasList = filtered) }
     }
 
     /**
-     * Mengisi _allAktivitas dan uiState dengan data contoh/dummy.
-     * HANYA UNTUK DEVELOPMENT — hapus/ganti fungsi ini setelah
-     * KegiatanRepository.kt selesai dibuat dan bisa menyuplai data nyata.
+     * Memasukkan data dummy awal ke list lokal agar antarmuka pengguna dapat dicoba.
      */
     private fun loadDummyData() {
         val dummy = listOf(
             Aktivitas(
                 id = "1",
-                judul = "Audit Fasilitas Kampus",
-                deskripsi = "Inspeksi keselamatan dan infrastruktur triwulan untuk Gedung Barat.",
-                status = StatusAktivitas.BERLANGSUNG,
-                progress = 0.65f, // 65% selesai
-                tanggal = "Berlangsung",
+                judul = "Campus Facility Audit", // Disesuaikan dengan gambar
+                deskripsi = "Quarterly safety and infrastructure inspection for West Wing.", // Disesuaikan dengan gambar
+                status = StatusAktivitas.BERLANGSUNG, // In Progress
+                progress = 0.65f, // 65%
+                tanggal = "In Progress", // Status waktu di pojok kanan atas
             ),
             Aktivitas(
                 id = "2",
-                judul = "Stok Tahunan 2023",
-                deskripsi = "Verifikasi global semua aset berkategori dan perangkat IT.",
-                status = StatusAktivitas.SELESAI,
+                judul = "Annual Stocktake 2023", // Disesuaikan dengan gambar
+                deskripsi = "Global verification of all categorized assets and IT equipment.", // Disesuaikan dengan gambar
+                status = StatusAktivitas.SELESAI, // Completed
                 progress = 1f, // 100% selesai
-                tanggal = "18 Okt 2023",
+                tanggal = "Oct 18, 2023", // Tanggal rilis selesai
             ),
             Aktivitas(
                 id = "3",
-                judul = "Pemeliharaan AC Gedung C",
-                deskripsi = "Pengecekan rutin unit AC di seluruh ruangan Gedung C lantai 2-4.",
-                status = StatusAktivitas.DRAFT,
-                progress = 0f, // belum mulai
+                judul = "Building C AC Maintenance", // Bahasa Inggris untuk kegiatan draf
+                deskripsi = "Routine AC unit checking across all rooms on Building C floors 2-4.",
+                status = StatusAktivitas.DRAFT, // Tetap disimpan di repo lokal
+                progress = 0f, // Belum mulai
                 tanggal = "Draft",
             ),
         )
@@ -203,14 +156,12 @@ class AktivitasViewModel @Inject constructor(
     }
 
     // =========================================================================
-    // NETWORK MONITOR
+    // BLOK LOGIKA PENGAMAT KONEKSI INTERNET
     // Aktifkan blok ini setelah NetworkMonitor.kt dari Adam selesai
     // =========================================================================
 
     /**
-     * Mengamati status koneksi internet secara real-time menggunakan Flow.
-     * Saat koneksi terputus → isOffline = true → OfflineBanner muncul di Screen.
-     * Saat koneksi kembali → isOffline = false → OfflineBanner hilang dengan animasi.
+     * Mengamati status online/offline jaringan secara reaktif.
      */
     // private fun observeNetwork() {
     //     viewModelScope.launch {
