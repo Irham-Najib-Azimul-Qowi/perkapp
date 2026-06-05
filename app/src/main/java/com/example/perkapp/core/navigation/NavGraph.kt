@@ -1,34 +1,79 @@
 package com.example.perkapp.core.navigation
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.perkapp.features.auth.ui.LoginScreen
+import com.example.perkapp.features.auth.ui.SplashScreen
+import com.example.perkapp.features.auth.ui.RegisterScreen
+import com.example.perkapp.features.kegiatan.ui.HomeScreen
+import com.example.perkapp.features.alat.ui.InventarisScreen
 
 @Composable
-fun SetupNavGraph(navController: NavHostController) {
+fun SetupNavGraph(
+    navController: NavHostController,
+    paddingValues: PaddingValues
+) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route // Sementara kita set mulai dari Login
+        startDestination = Screen.Splash.route,
+        modifier = Modifier.padding(paddingValues)
     ) {
 
         // --- BAGIAN ADAM (AUTH) ---
         composable(route = Screen.Splash.route) {
-            // Nanti diisi SplashScreen()
+            SplashScreen(
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                }
+            )
         }
         composable(route = Screen.Login.route) {
-            // Nanti diisi LoginScreen()
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onNavigateToRegister = {
+                    navController.navigate(Screen.Register.route)
+                }
+            )
         }
         composable(route = Screen.Register.route) {
-            // Nanti diisi RegisterScreen()
+            RegisterScreen(
+                onRegisterSuccess = {
+                    // Sukses daftar, bypass dan langsung masuk Home atau Login
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Register.route) { inclusive = true }
+                    }
+                },
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         // --- BAGIAN REJA & NAJIB ---
         composable(route = Screen.Home.route) {
-            // Nanti diisi HomeScreen() punya Reja
+            HomeScreen()
         }
         composable(route = Screen.Inventaris.route) {
-            // Nanti diisi InventarisScreen() punya Najib
+            InventarisScreen()
+        }
+        composable(route = Screen.Kegiatan.route) {
+            // Jika Kegiatan ada halamannya sendiri, taruh di sini
         }
     }
 }
