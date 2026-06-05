@@ -67,13 +67,39 @@ fun SetupNavGraph(
 
         // --- BAGIAN REJA & NAJIB ---
         composable(route = Screen.Home.route) {
-            HomeScreen()
+            val repository = com.example.perkapp.features.kegiatan.data.FakeKegiatanRepository()
+            val homeViewModel: com.example.perkapp.features.kegiatan.ui.HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                factory = com.example.perkapp.features.kegiatan.ui.HomeViewModel.HomeViewModelFactory(repository)
+            )
+
+            com.example.perkapp.features.kegiatan.ui.HomeScreen(
+                navController = navController,
+                viewModel = homeViewModel,
+                onNavigateToActivities = {
+                    navController.navigate(Screen.Kegiatan.route)
+                },
+                onNavigateToInventory = {
+                    navController.navigate(Screen.Inventaris.route)
+                }
+            )
         }
         composable(route = Screen.Inventaris.route) {
-            InventarisScreen()
+            com.example.perkapp.features.alat.ui.screen.InventarisScreen(
+                // You might need to pass viewmodel and navigation callbacks here based on Najib's implementation
+            )
         }
         composable(route = Screen.Kegiatan.route) {
-            // Jika Kegiatan ada halamannya sendiri, taruh di sini
+            com.example.perkapp.core.features.kegiatan.ui.AktivitasScreen(
+                onTambahAktivitas = {
+                    navController.navigate(Screen.TambahKegiatan.route)
+                },
+                onDetailAktivitas = { id ->
+                    navController.navigate(Screen.DetailKegiatan.createRoute(id))
+                }
+            )
+        }
+        composable(route = Screen.TambahKegiatan.route) {
+            com.example.perkapp.core.features.kegiatan.ui.TambahKegiatanScreen(navController = navController)
         }
         composable(route = Screen.Profile.route) {
             com.example.perkapp.features.auth.ui.ProfileScreen(
