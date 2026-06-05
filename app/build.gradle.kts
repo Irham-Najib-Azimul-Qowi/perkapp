@@ -78,4 +78,7 @@ dependencies {
 
     // WorkManager for offline sync
     implementation(libs.work.runtime.ktx)
+
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

@@ -1,24 +1,75 @@
 package com.example.perkapp.core.network
 
-import com.example.perkapp.core.datastore.UserPreferences
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    // Sesuai instruksi: Base URL https://api.perkapp.com/v1
-    private const val BASE_URL = "https://api.perkapp.com/v1/"
+    private const val BASE_URL = "https://cakramanggalapnm.com/api/v1/"
 
-    fun getClient(userPreferences: UserPreferences): Retrofit {
-        // Pasang interceptor agar semua request API otomatis diselipkan Bearer Token
-        val client = OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(userPreferences))
-            .build()
+    var authToken: String = ""
 
-        return Retrofit.Builder()
+    private val authInterceptor = Interceptor { chain ->
+        val request = chain.request().newBuilder()
+            .addHeader("Accept", "application/json")
+        if (authToken.isNotBlank()) {
+            request.addHeader("Authorization", "Bearer $authToken")
+        }
+        chain.proceed(request.build())
+    }
+
+    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+
+    private val client = OkHttpClient.Builder()
+        .addInterceptor(authInterceptor)
+        .addInterceptor(loggingInterceptor)
+        .build()
+
+    val instance: Retrofit by lazy {
+        Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+    }
+
+    suspend fun performSilentLogin(context: android.content.Context): Boolean {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val loginClient = OkHttpClient.Builder().build()
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val jsonBody = "{\"email\":\"test@test.com\",\"password\":\"password123\"}"
+                val body = jsonBody.toRequestBody(mediaType)
+                val request = okhttp3.Request.Builder()
+                    .url(BASE_URL + "auth/login")
+                    .post(body)
+                    .addHeader("Accept", "application/json")
+                    .build()
+
+                val response = loginClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    if (responseBody != null) {
+                        val jsonObject = org.json.JSONObject(responseBody)
+                        if (jsonObject.getBoolean("success")) {
+                            val dataObject = jsonObject.getJSONObject("data")
+                            val token = dataObject.getString("token")
+                            authToken = token
+                            return@withContext true
+                        }
+                    }
+                }
+                false
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
     }
 }

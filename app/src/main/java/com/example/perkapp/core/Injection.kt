@@ -12,7 +12,7 @@ object Injection {
     fun provideAuthRepository(context: Context): AuthRepository {
         val userPreferences = UserPreferences(context.dataStore)
         val database = AppDatabase.getDatabase(context)
-        val apiService = RetrofitClient.getClient(userPreferences).create(AuthApiService::class.java)
+        val apiService = RetrofitClient.instance.create(AuthApiService::class.java)
         
         return AuthRepository(apiService, userPreferences, database.userDao())
     }
