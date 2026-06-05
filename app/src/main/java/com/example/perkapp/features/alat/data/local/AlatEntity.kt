@@ -17,5 +17,11 @@ data class AlatEntity(
 
     val condition: String,
 
-    val sync_status: String = "Synced"
+    // Status sinkronisasi: "synced", "pending"
+    val sync_status: String = "synced",
+
+    val image_path: String? = null,
+
+    // Aksi pending untuk sync: "create", "update", "delete", atau null jika sudah synced
+    val pending_action: String? = null
 )

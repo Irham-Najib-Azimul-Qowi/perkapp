@@ -7,5 +7,7 @@ data class CreateAlatRequest(
 
     val total_qty: Int,
 
-    val condition: String
+    val condition: String,
+
+    val image_path: String? = null
 )

@@ -1,30 +1,57 @@
 package com.example.perkapp.features.alat.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.perkapp.features.alat.data.local.AlatDao
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.example.perkapp.core.utils.NetworkUtils
 import com.example.perkapp.features.alat.ui.component.AlatCard
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
-import kotlin.collections.emptyList
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +62,23 @@ fun InventarisScreen(
 ) {
     val alatList by viewModel.alatList.observeAsState(emptyList())
     val isLoading by viewModel.isLoading.observeAsState(false)
+    val context = LocalContext.current
+    var isOnline by remember { mutableStateOf(NetworkUtils.isOnline(context)) }
+
+    // Observasi status jaringan secara real-time
+    LaunchedEffect(Unit) {
+        NetworkUtils.observeNetworkStatus(context).collectLatest { online ->
+            isOnline = online
+            if (online) {
+                // Lakukan silent login terlebih dahulu agar request ke server sukses terautentikasi
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.example.perkapp.core.network.RetrofitClient.performSilentLogin(context)
+                }
+                // Refresh data saat kembali online
+                viewModel.getAllAlat()
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.getAllAlat()
@@ -42,30 +86,180 @@ fun InventarisScreen(
 
     Scaffold(
         topBar =  {
-            TopAppBar(title = { Text("Inventaris Alat")})
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Inventaris Alat",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White
+                )
+            )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick =  onAddClick) {
-                Icon(Icons.Default.Add, contentDescription =  "Tambah Alat")
+            FloatingActionButton(
+                onClick =  onAddClick,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(64.dp)
+                    .shadow(8.dp, CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription =  "Tambah Alat",
+                    modifier = Modifier.size(28.dp)
+                )
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        if (isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // Banner offline
+            AnimatedVisibility(
+                visible = !isOnline,
+                enter = slideInVertically() + fadeIn(),
+                exit = slideOutVertically() + fadeOut()
             ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding)
-            ) {
-                items(alatList) { alat ->
-                    AlatCard(
-                        alat = alat,
-                        onClick = { onItemClick(alat.id)}
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFFF3CD))
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color(0xFF856404)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Mode Offline — Data akan disinkronkan saat online",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF856404)
+                    )
+                }
+            }
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth =  3.dp
+                    )
+                }
+            } else if (alatList.isEmpty()){
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text =  "Belum ada alat",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Tekan tombol + untuk menambah alat baru",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                // Dashboard ringkasan status alat
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Total Alat
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "Total Alat",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${alatList.size} Alat",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+
+                    // Pending/Sync Status
+                    val pendingCount = alatList.count { it.sync_status == "pending" }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                color = if (pendingCount > 0) Color(0xFFFFF3CD) else Color(0xFFE8F5E9),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = "Penyimpanan",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (pendingCount > 0) Color(0xFF856404) else Color(0xFF2E7D32),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (pendingCount > 0) "$pendingCount Pending di Room" else "Semua Tersinkron",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (pendingCount > 0) Color(0xFF856404) else Color(0xFF2E7D32)
+                            )
+                        }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(alatList) { alat ->
+                        AlatCard(
+                            alat = alat,
+                            onClick = { onItemClick(alat.id)}
+                        )
+                    }
                 }
             }
         }

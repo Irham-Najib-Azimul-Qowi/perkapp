@@ -4,7 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import okhttp3.internal.connection.RouteSelector
+import androidx.room.Update
 
 @Dao
 interface ImageDao {
@@ -19,4 +19,14 @@ interface ImageDao {
 
     @Query("DELETE FROM images WHERE id = :id")
     suspend fun deleteImage(id: String)
+
+    // Ambil semua gambar yang belum ter-sync (pending)
+    @Query("SELECT * FROM images WHERE sync_status = 'pending'")
+    suspend fun getPendingImages(): List<ImageEntity>
+
+    @Update
+    suspend fun updateImage(image: ImageEntity)
+
+    @Query("SELECT * FROM images WHERE image_url = :imageUrl LIMIT 1")
+    suspend fun getImageByUrl(imageUrl: String): ImageEntity?
 }
