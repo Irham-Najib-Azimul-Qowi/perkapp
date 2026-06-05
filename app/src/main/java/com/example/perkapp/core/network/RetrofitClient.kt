@@ -3,6 +3,8 @@ package com.example.perkapp.core.network
 import okhttp3.Interceptor
 import okhttp3.OkHttp
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -37,5 +39,44 @@ object RetrofitClient {
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+    }
+
+    /**
+     * Melakukan silent auto-login di latar belakang untuk mendapatkan token JWT.
+     * Digunakan sebagai solusi sementara karena halaman login belum dibuat.
+     */
+    suspend fun performSilentLogin(context: android.content.Context): Boolean {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Gunakan client terpisah untuk menghindari interceptor token lama yang expired
+                val loginClient = OkHttpClient.Builder().build()
+                val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
+                val jsonBody = "{\"email\":\"test@test.com\",\"password\":\"password123\"}"
+                val body = jsonBody.toRequestBody(mediaType)
+                val request = okhttp3.Request.Builder()
+                    .url(BASE_URL + "auth/login")
+                    .post(body)
+                    .addHeader("Accept", "application/json")
+                    .build()
+
+                val response = loginClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    if (responseBody != null) {
+                        val jsonObject = org.json.JSONObject(responseBody)
+                        if (jsonObject.getBoolean("success")) {
+                            val dataObject = jsonObject.getJSONObject("data")
+                            val token = dataObject.getString("token")
+                            authToken = token
+                            return@withContext true
+                        }
+                    }
+                }
+                false
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
     }
 }
