@@ -6,17 +6,20 @@ import androidx.room.RoomDatabase
 import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.perkapp.core.database.dao.UserDao
+import com.example.perkapp.core.database.entity.UserEntity
 import com.example.perkapp.features.alat.data.local.AlatDao
 import com.example.perkapp.features.alat.data.local.AlatEntity
 import com.example.perkapp.features.media.data.ImageDao
 import com.example.perkapp.features.media.data.ImageEntity
 
 @Database(
-    entities = [AlatEntity::class, ImageEntity::class],
+    entities = [UserEntity::class, AlatEntity::class, ImageEntity::class],
     version = 2,
     exportSchema = false
 )
-abstract class AppDatabase : RoomDatabase(){
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun userDao(): UserDao
     abstract fun alatDao(): AlatDao
     abstract fun imageDao(): ImageDao
 

@@ -1,7 +1,6 @@
-package com.example.perkapp.ui.theme
+package com.example.perkapp.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
-
 
 // === PALET WARNA DARI UI STYLE GUIDE ===
 
@@ -20,7 +19,7 @@ val PerkSecondaryContainer = Color(0xFFBBF7D0)
 val PerkOnSecondaryContainer = Color(0xFF052E16)
 
 // Tertiary - Coral/Salmon
-val PerkTertiary = Color(0xFFFF887C)
+val PerkTertiary = Color(0xFFFF8B7C)
 val PerkTertiaryLight = Color(0xFFFFB4AB)
 val PerkTertiaryDark = Color(0xFFE57373)
 val PerkTertiaryContainer = Color(0xFFFFDAD6)

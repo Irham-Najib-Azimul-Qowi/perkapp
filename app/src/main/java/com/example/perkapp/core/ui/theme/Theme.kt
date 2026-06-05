@@ -1,4 +1,4 @@
-package com.example.perkapp.ui.theme
+package com.example.perkapp.core.ui.theme
 
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
