@@ -11,16 +11,21 @@ import com.example.perkapp.core.ui.theme.PerkappTheme
 import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 
+import com.example.perkapp.core.datastore.UserPreferences
+import com.example.perkapp.core.datastore.dataStore
+import kotlinx.coroutines.flow.first
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Silent Auto-login solusi sementara
+        // Sync pending data if already logged in and online
         lifecycleScope.launch {
-            if (com.example.perkapp.core.utils.NetworkUtils.isOnline(applicationContext)) {
-                RetrofitClient.performSilentLogin(applicationContext)
+            val userPrefs = UserPreferences(applicationContext.dataStore)
+            val token = userPrefs.getAuthToken.first()
+            if (!token.isNullOrBlank() && com.example.perkapp.core.utils.NetworkUtils.isOnline(applicationContext)) {
                 SyncManager.syncNow(applicationContext)
             }
         }
