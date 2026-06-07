@@ -35,8 +35,14 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     fun login(request: LoginRequest) {
-        if (request.email.isBlank() || request.password.isBlank()) {
-            _loginState.value = AuthState.Error("Email atau password salah.")
+        if (request.email.isBlank() && request.password.isBlank()) {
+            _loginState.value = AuthState.Error("Email dan Password tidak boleh kosong.")
+            return
+        } else if (request.email.isBlank()) {
+            _loginState.value = AuthState.Error("Email tidak boleh kosong.")
+            return
+        } else if (request.password.isBlank()) {
+            _loginState.value = AuthState.Error("Password tidak boleh kosong.")
             return
         }
         viewModelScope.launch {
@@ -70,8 +76,17 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     fun register(request: RegisterRequest) {
-        if (request.name.isBlank() || request.email.isBlank() || request.password.isBlank()) {
-            _registerState.value = AuthState.Error("Data pendaftaran tidak valid.")
+        if (request.name.isBlank() && request.email.isBlank() && request.password.isBlank()) {
+            _registerState.value = AuthState.Error("Username, Email, dan Password tidak boleh kosong.")
+            return
+        } else if (request.name.isBlank()) {
+            _registerState.value = AuthState.Error("Username tidak boleh kosong.")
+            return
+        } else if (request.email.isBlank()) {
+            _registerState.value = AuthState.Error("Email tidak boleh kosong.")
+            return
+        } else if (request.password.isBlank()) {
+            _registerState.value = AuthState.Error("Password tidak boleh kosong.")
             return
         }
         viewModelScope.launch {
