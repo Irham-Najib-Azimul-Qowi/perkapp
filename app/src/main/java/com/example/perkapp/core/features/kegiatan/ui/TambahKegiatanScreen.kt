@@ -425,10 +425,12 @@ fun TambahKegiatanScreen(
                 ) {
                     Button(
                         onClick = {
-                            if (namaAktivitas.isNotBlank() && tanggalPinjam.isNotBlank() && daftarPeminjam.isNotEmpty() && lokasi.isNotBlank()) {
-                                currentStep = 2
-                            } else {
-                                Toast.makeText(context, "Silakan lengkapi data wajib (Nama, Tanggal, Peminjam/Chips, Lokasi)!", Toast.LENGTH_SHORT).show()
+                            when {
+                                namaAktivitas.isBlank() -> Toast.makeText(context, "Nama Kegiatan tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                                tanggalPinjam.isBlank() -> Toast.makeText(context, "Tanggal tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                                daftarPeminjam.isEmpty() -> Toast.makeText(context, "Peminjam harus diisi minimal 1", Toast.LENGTH_SHORT).show()
+                                lokasi.isBlank() -> Toast.makeText(context, "Lokasi tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                                else -> currentStep = 2
                             }
                         },
                         modifier = Modifier
@@ -596,6 +598,11 @@ fun TambahKegiatanScreen(
                                 val selectedToolsList = selectedQuantities.entries
                                     .filter { it.value > 0 }
                                     .map { Pair(it.key, it.value) }
+
+                                if (selectedToolsList.isEmpty() && externalTools.isEmpty()) {
+                                    Toast.makeText(context, "Pilih minimal 1 perlengkapan atau tambah alat dari luar!", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
 
                                 val peminjamString = daftarPeminjam.joinToString(", ")
 

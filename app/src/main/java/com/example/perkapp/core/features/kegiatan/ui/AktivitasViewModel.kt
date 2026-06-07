@@ -152,7 +152,12 @@ class AktivitasViewModel @Inject constructor(
                 _allAktivitas.value = mapped
                 applyFilter()
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = e.message) }
+                val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Periksa koneksi internet Anda."
+                } else {
+                    "Terjadi kesalahan saat memuat data. Silakan coba lagi."
+                }
+                _uiState.update { it.copy(errorMessage = errorMsg) }
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }

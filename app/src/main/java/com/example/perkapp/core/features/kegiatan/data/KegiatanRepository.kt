@@ -15,7 +15,7 @@ import java.util.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 
-data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String)
+data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String, val isApproved: Boolean = false)
 
 fun parseDescription(fullDesc: String?): ParsedDescription {
     if (fullDesc == null) return ParsedDescription("", "", "", "")
@@ -23,6 +23,7 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
     var lokasi = ""
     var kategori = ""
     var deskripsi = ""
+    var isApproved = false
     
     val lines = fullDesc.split("\n")
     for (line in lines) {
@@ -31,6 +32,12 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
             trimmed.startsWith("Peminjam: ") -> peminjam = trimmed.removePrefix("Peminjam: ")
             trimmed.startsWith("Lokasi: ") -> lokasi = trimmed.removePrefix("Lokasi: ")
             trimmed.startsWith("Kategori: ") -> kategori = trimmed.removePrefix("Kategori: ")
+            trimmed.startsWith("StatusAlat: ") -> {
+                val statusStr = trimmed.removePrefix("StatusAlat: ").trim()
+                if (statusStr.equals("Approved", ignoreCase = true)) {
+                    isApproved = true
+                }
+            }
             trimmed.startsWith("Deskripsi: ") -> deskripsi = trimmed.removePrefix("Deskripsi: ")
             else -> {
                 if (trimmed.isNotBlank()) {
@@ -43,7 +50,7 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
             }
         }
     }
-    return ParsedDescription(peminjam, lokasi, kategori, deskripsi)
+    return ParsedDescription(peminjam, lokasi, kategori, deskripsi, isApproved)
 }
 
 interface KegiatanRepository {
@@ -187,7 +194,7 @@ class KegiatanRepositoryImpl(
                                 sync_status = "synced",
                                 pending_action = null,
                                 created_by = kegDto.created_by,
-                                alat_approved = localCopy?.alat_approved ?: false
+                                alat_approved = parsed.isApproved || (localCopy?.alat_approved ?: false)
                             )
                             dao.insertKegiatan(kegiatanEntity)
                             
@@ -276,7 +283,13 @@ class KegiatanRepositoryImpl(
         val existing = dao.getKegiatanById(kegiatanId)
         if (existing != null && NetworkUtils.isOnline(context)) {
             try {
-                val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nDeskripsi: ${existing.deskripsi}"
+                // Ensure we don't append it multiple times
+                val currentDesc = existing.deskripsi
+                val parsed = parseDescription(currentDesc) // wait, the DB stores pure deskripsi or the full desc?
+                // Ah! The DB stores the pure desc! The full desc is generated!
+                
+                var desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nStatusAlat: Approved\nDeskripsi: ${existing.deskripsi}"
+                
                 apiService.updateKegiatan(
                     id = kegiatanId,
                     request = UpdateKegiatanRequest(

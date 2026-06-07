@@ -82,7 +82,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Email / Username") },
+                label = { Text("Email") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),

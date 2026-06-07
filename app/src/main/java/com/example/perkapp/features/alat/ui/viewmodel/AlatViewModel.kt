@@ -55,7 +55,12 @@ class AlatViewModel(
                 }
                 alatList.value = repository.getAllAlat()
             } catch (e: Exception) {
-                errorMessage.value = e.message
+                val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Periksa koneksi internet Anda."
+                } else {
+                    "Terjadi kesalahan saat memuat data alat. Silakan coba lagi."
+                }
+                errorMessage.value = errorMsg
             } finally {
                 isLoading.value = false
             }
@@ -71,7 +76,12 @@ class AlatViewModel(
                 // Jadwalkan sync jika ada data pending
                 SyncManager.scheduleSyncWhenOnline(application)
             } catch (e: Exception) {
-                errorMessage.value = e.message
+                val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Alat akan disimpan dan disinkronkan nanti saat online."
+                } else {
+                    "Terjadi kesalahan saat menyimpan alat. Silakan coba lagi."
+                }
+                errorMessage.value = errorMsg
             } finally {
                 getAllAlat()
                 isLoading.value = false
@@ -93,7 +103,12 @@ class AlatViewModel(
                 // Jadwalkan sync jika ada data pending
                 SyncManager.scheduleSyncWhenOnline(application)
             } catch (e: Exception) {
-                errorMessage.value = e.message
+                val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Perubahan akan disinkronkan nanti saat online."
+                } else {
+                    "Terjadi kesalahan saat memperbarui alat. Silakan coba lagi."
+                }
+                errorMessage.value = errorMsg
             } finally {
                 getAllAlat()
                 isLoading.value = false
@@ -117,8 +132,15 @@ class AlatViewModel(
                 SyncManager.scheduleSyncWhenOnline(application)
                 onSuccess()
             } catch (e: Exception) {
-                errorMessage.value = e.message
-                onError(e.message ?: "Gagal menghapus alat")
+                val errorMsg = if (e.message?.contains("Alat sedang dipinjam") == true) {
+                    e.message
+                } else if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Penghapusan akan disinkronkan nanti."
+                } else {
+                    "Terjadi kesalahan saat menghapus alat. Silakan coba lagi."
+                }
+                errorMessage.value = errorMsg
+                onError(errorMsg ?: "Gagal menghapus alat")
             } finally {
                 getAllAlat()
                 isLoading.value = false

@@ -289,11 +289,22 @@ fun TambahAlatScreen(
             // Tombol Simpan (Primary style)
             Button(
                 onClick = {
-                    val qty = jumlah.toIntOrNull() ?: 0
-                    if (nama.isNotBlank() && kategori.isNotBlank() && qty > 0) {
-                        viewModel.createAlat(nama, kategori, qty, kondisi, imageUriString ?: "")
-                        onBack()
+                    if (nama.isBlank()) {
+                        android.widget.Toast.makeText(context, "Nama Alat tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        return@Button
                     }
+                    if (kategori.isBlank()) {
+                        android.widget.Toast.makeText(context, "Kategori tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    val qty = jumlah.toIntOrNull() ?: 0
+                    if (qty <= 0) {
+                        android.widget.Toast.makeText(context, "Jumlah harus lebih dari 0", android.widget.Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    
+                    viewModel.createAlat(nama, kategori, qty, kondisi, imageUriString ?: "")
+                    onBack()
                 },
                 enabled = !isLoading,
                 modifier = Modifier
