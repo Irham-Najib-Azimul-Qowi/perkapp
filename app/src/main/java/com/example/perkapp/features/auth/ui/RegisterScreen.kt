@@ -119,12 +119,7 @@ fun RegisterScreen(
 
             Button(
                 onClick = {
-                    when {
-                        name.isBlank() -> android.widget.Toast.makeText(context, "Username tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
-                        email.isBlank() -> android.widget.Toast.makeText(context, "Email tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
-                        password.isBlank() -> android.widget.Toast.makeText(context, "Password tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
-                        else -> viewModel.register(RegisterRequest(name = name, email = email, password = password))
-                    }
+                    viewModel.register(RegisterRequest(name = name, email = email, password = password))
                 },
                 modifier = Modifier
                     .fillMaxWidth()

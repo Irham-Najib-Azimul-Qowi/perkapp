@@ -35,6 +35,10 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     fun login(request: LoginRequest) {
+        if (request.email.isBlank() || request.password.isBlank()) {
+            _loginState.value = AuthState.Error("Email atau password salah.")
+            return
+        }
         viewModelScope.launch {
             _loginState.value = AuthState.Loading
             val result = repository.login(request)
@@ -66,6 +70,10 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     fun register(request: RegisterRequest) {
+        if (request.name.isBlank() || request.email.isBlank() || request.password.isBlank()) {
+            _registerState.value = AuthState.Error("Data pendaftaran tidak valid.")
+            return
+        }
         viewModelScope.launch {
             _registerState.value = AuthState.Loading
             val result = repository.register(request)

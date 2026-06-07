@@ -107,11 +107,7 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-                    when {
-                        username.isBlank() -> android.widget.Toast.makeText(context, "Email tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
-                        password.isBlank() -> android.widget.Toast.makeText(context, "Password tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
-                        else -> viewModel.login(LoginRequest(email = username, password = password))
-                    }
+                    viewModel.login(LoginRequest(email = username, password = password))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
