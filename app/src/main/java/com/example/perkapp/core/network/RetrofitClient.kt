@@ -107,7 +107,7 @@ object RetrofitClient {
             try {
                 val loginClient = OkHttpClient.Builder().build()
                 val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-                val jsonBody = "{\"email\":\"admin.perkapp@cakramanggala.com\",\"password\":\"perkapp123\"}"
+                val jsonBody = "{\"email\":\"admin@cakramanggala.com\",\"password\":\"admin123\"}"
                 val body = jsonBody.toRequestBody(mediaType)
                 val request = okhttp3.Request.Builder()
                     .url(BASE_URL + "auth/login")
