@@ -50,10 +50,15 @@ object ImageUtils {
     }
 
     private fun loadBitmapFromNetwork(context: Context, urlString: String): Bitmap? {
-        android.util.Log.d("ImageUtils", "loadBitmapFromNetwork: urlString = $urlString")
+        val correctedUrl = if (urlString.contains("localhost") || urlString.contains("127.0.0.1") || urlString.contains("10.0.2.2")) {
+            urlString.replace(Regex("^https?://[^/]+"), "https://cakramanggalapnm.com")
+        } else {
+            urlString
+        }
+        android.util.Log.d("ImageUtils", "loadBitmapFromNetwork: urlString = $urlString, correctedUrl = $correctedUrl")
         return try {
             val client = okhttp3.OkHttpClient()
-            val request = okhttp3.Request.Builder().url(urlString).build()
+            val request = okhttp3.Request.Builder().url(correctedUrl).build()
             client.newCall(request).execute().use { response ->
                 android.util.Log.d("ImageUtils", "loadBitmapFromNetwork: HTTP code = ${response.code}, isSuccessful = ${response.isSuccessful}")
                 if (response.isSuccessful) {
@@ -64,22 +69,25 @@ object ImageUtils {
                     }
                 } else {
                     android.util.Log.w("ImageUtils", "loadBitmapFromNetwork: failed, trying local fallback...")
-                    loadFallbackLocalImage(context, urlString)
+                    loadFallbackLocalImage(context, correctedUrl, urlString)
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("ImageUtils", "loadBitmapFromNetwork: error loading $urlString, trying local fallback...", e)
-            loadFallbackLocalImage(context, urlString)
+            android.util.Log.e("ImageUtils", "loadBitmapFromNetwork: error loading $correctedUrl, trying local fallback...", e)
+            loadFallbackLocalImage(context, correctedUrl, urlString)
         }
     }
 
-    private fun loadFallbackLocalImage(context: Context, urlString: String): Bitmap? {
+    private fun loadFallbackLocalImage(context: Context, urlString: String, originalUrl: String? = null): Bitmap? {
         return try {
             val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
             val imageDao = db.imageDao()
             var localPath: String? = null
             kotlinx.coroutines.runBlocking {
-                val entity = imageDao.getImageByUrl(urlString)
+                var entity = imageDao.getImageByUrl(urlString)
+                if (entity == null && originalUrl != null) {
+                    entity = imageDao.getImageByUrl(originalUrl)
+                }
                 localPath = entity?.local_path
             }
             if (!localPath.isNullOrBlank()) {
