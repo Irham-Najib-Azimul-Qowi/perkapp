@@ -23,6 +23,7 @@ fun LoginScreen(
         factory = AuthViewModelFactory(Injection.provideAuthRepository(LocalContext.current))
     )
 ) {
+    val context = LocalContext.current
     val loginState by viewModel.loginState.collectAsState()
 
     var username by remember { mutableStateOf("") }
@@ -106,7 +107,11 @@ fun LoginScreen(
 
             Button(
                 onClick = {
-                    viewModel.login(LoginRequest(email = username, password = password))
+                    when {
+                        username.isBlank() -> android.widget.Toast.makeText(context, "Email tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        password.isBlank() -> android.widget.Toast.makeText(context, "Password tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        else -> viewModel.login(LoginRequest(email = username, password = password))
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -115,7 +120,7 @@ fun LoginScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 ),
-                enabled = !isLoading && username.isNotBlank() && password.isNotBlank()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

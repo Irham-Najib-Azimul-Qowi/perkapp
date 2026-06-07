@@ -45,7 +45,12 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _loginState.value = AuthState.Error(response.message)
                 }
             }.onFailure { exception ->
-                _loginState.value = AuthState.Error(exception.message ?: "Terjadi kesalahan")
+                val errorMsg = if (exception is java.net.UnknownHostException || exception is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Periksa koneksi internet Anda."
+                } else {
+                    exception.message ?: "Terjadi kesalahan"
+                }
+                _loginState.value = AuthState.Error(errorMsg)
             }
         }
     }
@@ -61,7 +66,12 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
                     _registerState.value = AuthState.Error(response.message)
                 }
             }.onFailure { exception ->
-                _registerState.value = AuthState.Error(exception.message ?: "Terjadi kesalahan")
+                val errorMsg = if (exception is java.net.UnknownHostException || exception is java.net.ConnectException) {
+                    "Gagal terhubung ke server. Periksa koneksi internet Anda."
+                } else {
+                    exception.message ?: "Terjadi kesalahan"
+                }
+                _registerState.value = AuthState.Error(errorMsg)
             }
         }
     }

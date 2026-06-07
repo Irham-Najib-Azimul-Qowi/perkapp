@@ -23,6 +23,7 @@ fun RegisterScreen(
         factory = AuthViewModelFactory(Injection.provideAuthRepository(LocalContext.current))
     )
 ) {
+    val context = LocalContext.current
     val registerState by viewModel.registerState.collectAsState()
 
     var name by remember { mutableStateOf("") }
@@ -30,6 +31,7 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     val isLoading = registerState is AuthState.Loading
 
+    // Menangani state success
     LaunchedEffect(registerState) {
         if (registerState is AuthState.Success) {
             onRegisterSuccess()
@@ -117,7 +119,12 @@ fun RegisterScreen(
 
             Button(
                 onClick = {
-                    viewModel.register(RegisterRequest(name = name, email = email, password = password))
+                    when {
+                        name.isBlank() -> android.widget.Toast.makeText(context, "Username tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        email.isBlank() -> android.widget.Toast.makeText(context, "Email tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        password.isBlank() -> android.widget.Toast.makeText(context, "Password tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        else -> viewModel.register(RegisterRequest(name = name, email = email, password = password))
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -126,7 +133,7 @@ fun RegisterScreen(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 ),
-                enabled = !isLoading && name.isNotBlank() && email.isNotBlank() && password.isNotBlank()
+                enabled = !isLoading
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(

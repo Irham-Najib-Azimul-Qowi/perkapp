@@ -308,16 +308,22 @@ fun EditAlatScreen(
             Button(
                 onClick = {
                     val qty = jumlah.toIntOrNull() ?: 0
-                    if (nama.isNotBlank() && kategori.isNotBlank() && qty > 0 && alat != null) {
-                        val request = CreateAlatRequest(
-                            name = nama,
-                            category = kategori,
-                            total_qty = qty,
-                            condition = kondisi,
-                            image_path = imageUriString
-                        )
-                        viewModel.updateAlat(alat!!, request)
-                        onBack()
+                    when {
+                        nama.isBlank() -> android.widget.Toast.makeText(context, "Nama Alat tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        kategori.isBlank() -> android.widget.Toast.makeText(context, "Kategori tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
+                        qty <= 0 -> android.widget.Toast.makeText(context, "Jumlah harus lebih dari 0", android.widget.Toast.LENGTH_SHORT).show()
+                        alat == null -> android.widget.Toast.makeText(context, "Data alat tidak ditemukan", android.widget.Toast.LENGTH_SHORT).show()
+                        else -> {
+                            val request = CreateAlatRequest(
+                                name = nama,
+                                category = kategori,
+                                total_qty = qty,
+                                condition = kondisi,
+                                image_path = imageUriString
+                            )
+                            viewModel.updateAlat(alat!!, request)
+                            onBack()
+                        }
                     }
                 },
                 modifier = Modifier

@@ -283,12 +283,8 @@ class KegiatanRepositoryImpl(
         val existing = dao.getKegiatanById(kegiatanId)
         if (existing != null && NetworkUtils.isOnline(context)) {
             try {
-                // Ensure we don't append it multiple times
-                val currentDesc = existing.deskripsi
-                val parsed = parseDescription(currentDesc) // wait, the DB stores pure deskripsi or the full desc?
-                // Ah! The DB stores the pure desc! The full desc is generated!
-                
-                var desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nStatusAlat: Approved\nDeskripsi: ${existing.deskripsi}"
+                // Include StatusAlat: Approved in the description sent to server
+                val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nStatusAlat: Approved\nDeskripsi: ${existing.deskripsi}"
                 
                 apiService.updateKegiatan(
                     id = kegiatanId,
@@ -447,7 +443,8 @@ class KegiatanRepositoryImpl(
         // Try direct sync if online
         if (NetworkUtils.isOnline(context)) {
             try {
-                val desc = "Peminjam: $finalPeminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
+                val approvalTag = if (isCreatorAdmin) "\nStatusAlat: Approved" else ""
+                val desc = "Peminjam: $finalPeminjam\nLokasi: $lokasi\nKategori: $kategori${approvalTag}\nDeskripsi: $deskripsi"
                 val response = apiService.createKegiatan(
                     CreateKegiatanRequest(
                         id = kegiatanId,
@@ -562,7 +559,8 @@ class KegiatanRepositoryImpl(
             val pendingKegiatan = dao.getPendingKegiatan()
             for (keg in pendingKegiatan) {
                 if (keg.pending_action == "create") {
-                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}\nDeskripsi: ${keg.deskripsi}"
+                    val approvalTag = if (keg.alat_approved) "\nStatusAlat: Approved" else ""
+                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}${approvalTag}\nDeskripsi: ${keg.deskripsi}"
                     val response = apiService.createKegiatan(
                         CreateKegiatanRequest(
                             id = keg.id,
@@ -578,7 +576,8 @@ class KegiatanRepositoryImpl(
                         success = false
                     }
                 } else if (keg.pending_action == "update") {
-                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}\nDeskripsi: ${keg.deskripsi}"
+                    val approvalTag = if (keg.alat_approved) "\nStatusAlat: Approved" else ""
+                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}${approvalTag}\nDeskripsi: ${keg.deskripsi}"
                     val response = apiService.updateKegiatan(
                         id = keg.id,
                         request = UpdateKegiatanRequest(

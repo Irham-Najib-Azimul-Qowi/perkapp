@@ -327,24 +327,28 @@ fun EditKegiatanScreen(
 
             Button(
                 onClick = {
-                    if (judul.isNotBlank() && lokasi.isNotBlank() && tanggal.isNotBlank() && daftarPeminjam.isNotEmpty()) {
-                        val peminjamString = daftarPeminjam.joinToString(", ")
-                        viewModel.updateKegiatan(
-                            id = kegiatanId,
-                            judul = judul,
-                            kategori = "Umum",
-                            lokasi = lokasi,
-                            tanggal = tanggal,
-                            status = status,
-                            peminjam = peminjamString,
-                            deskripsi = deskripsi,
-                            onSuccess = {
-                                Toast.makeText(context, "Kegiatan berhasil diperbarui!", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }
-                        )
-                    } else {
-                        Toast.makeText(context, "Mohon lengkapi semua field wajib!", Toast.LENGTH_SHORT).show()
+                    when {
+                        judul.isBlank() -> Toast.makeText(context, "Nama Kegiatan tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                        lokasi.isBlank() -> Toast.makeText(context, "Lokasi tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                        tanggal.isBlank() -> Toast.makeText(context, "Tanggal tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                        daftarPeminjam.isEmpty() -> Toast.makeText(context, "Peminjam harus diisi minimal 1", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            val peminjamString = daftarPeminjam.joinToString(", ")
+                            viewModel.updateKegiatan(
+                                id = kegiatanId,
+                                judul = judul,
+                                kategori = "Umum",
+                                lokasi = lokasi,
+                                tanggal = tanggal,
+                                status = status,
+                                peminjam = peminjamString,
+                                deskripsi = deskripsi,
+                                onSuccess = {
+                                    Toast.makeText(context, "Kegiatan berhasil diperbarui!", Toast.LENGTH_SHORT).show()
+                                    onBack()
+                                }
+                            )
+                        }
                     }
                 },
                 modifier = Modifier

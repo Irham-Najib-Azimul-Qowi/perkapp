@@ -199,17 +199,19 @@ fun TambahAlatLuarScreen(
 
             Button(
                 onClick = {
-                    if (nama.isNotBlank() && identitas.isNotBlank()) {
-                        val compositeValue = if (!imageUriString.isNullOrBlank()) {
-                            "$nama|$imageUriString"
-                        } else {
-                            "$nama|"
+                    when {
+                        nama.isBlank() -> Toast.makeText(context, "Nama Alat Luar tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                        identitas.isBlank() -> Toast.makeText(context, "Identitas / Keterangan tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            val compositeValue = if (!imageUriString.isNullOrBlank()) {
+                                "$nama|$imageUriString"
+                            } else {
+                                "$nama|"
+                            }
+                            navController.previousBackStackEntry?.savedStateHandle?.set("alat_luar_nama", compositeValue)
+                            Toast.makeText(context, "Alat luar berhasil disimpan!", Toast.LENGTH_SHORT).show()
+                            onBack()
                         }
-                        navController.previousBackStackEntry?.savedStateHandle?.set("alat_luar_nama", compositeValue)
-                        Toast.makeText(context, "Alat luar berhasil disimpan!", Toast.LENGTH_SHORT).show()
-                        onBack()
-                    } else {
-                        Toast.makeText(context, "Silakan lengkapi semua field!", Toast.LENGTH_SHORT).show()
                     }
                 },
                 modifier = Modifier
