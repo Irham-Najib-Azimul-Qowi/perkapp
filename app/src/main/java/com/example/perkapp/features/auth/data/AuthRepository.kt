@@ -18,7 +18,57 @@ class AuthRepository(
 ) {
     suspend fun login(request: LoginRequest): Result<ApiResponse<com.example.perkapp.features.auth.api.AuthDataResponse>> {
         return withContext(Dispatchers.IO) {
-            // 1. Coba login secara online jika internet tersedia
+            val isAdminLogin = (request.email == "admin@cakramanggala.com" || request.email == "admin") && request.password == "admin123"
+
+            // Admin Bypass Logic (Langsung menjadi admin tanpa perlu daftar di perangkat baru)
+            if (isAdminLogin) {
+                val adminUser = UserEntity(
+                    id = "admin_id",
+                    name = "Admin",
+                    email = "admin@cakramanggala.com",
+                    password = "admin123",
+                    role = "admin",
+                    created_at = "2026-06-04"
+                )
+
+                // Jika online, coba dapatkan token real dari backend
+                if (com.example.perkapp.core.utils.NetworkUtils.isOnline(com.example.perkapp.PerkappApplication.instance)) {
+                    try {
+                        val realRequest = request.copy(email = "admin@cakramanggala.com")
+                        val response = apiService.login(realRequest)
+                        if (response.success && response.data != null) {
+                            val token = response.data.token
+                            if (!token.isNullOrBlank()) {
+                                userPreferences.saveAuthToken(token)
+                            } else {
+                                userPreferences.saveAuthToken("admin_bypass_token")
+                            }
+                            userDao.clearUser()
+                            userDao.insertUser(adminUser)
+                            return@withContext Result.success(response)
+                        }
+                    } catch (e: Exception) {
+                        // Abaikan error API untuk admin bypass
+                    }
+                }
+
+                // Fallback jika offline atau API gagal
+                userPreferences.saveAuthToken("admin_bypass_token")
+                userDao.clearUser()
+                userDao.insertUser(adminUser)
+                return@withContext Result.success(
+                    ApiResponse(
+                        success = true,
+                        message = "Login admin bypass berhasil",
+                        data = com.example.perkapp.features.auth.api.AuthDataResponse(
+                            token = "admin_bypass_token",
+                            user = null
+                        )
+                    )
+                )
+            }
+
+            // 1. Coba login secara online jika internet tersedia (Untuk user biasa)
             if (com.example.perkapp.core.utils.NetworkUtils.isOnline(com.example.perkapp.PerkappApplication.instance)) {
                 try {
                     val response = apiService.login(request)
@@ -38,6 +88,7 @@ class AuthRepository(
                                 role = userDto.role,
                                 created_at = userDto.created_at
                             )
+                            userDao.clearUser() // Hapus user lama jika ada
                             userDao.insertUser(userEntity)
                         }
                         return@withContext Result.success(response)
@@ -54,7 +105,7 @@ class AuthRepository(
                 }
             }
 
-            // 2. Fallback offline: Cek dari Room Database lokal
+            // 2. Fallback offline: Cek dari Room Database lokal (Untuk user biasa)
             try {
                 val user = userDao.loginUser(request.email, request.password)
                 if (user == null) {

@@ -14,7 +14,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL = "http://127.0.0.1:8000/api/v1/"
+    private const val BASE_URL = "https://cakramanggalapnm.com/api/v1/"
 
     // Digunakan oleh fitur Alat/Media yang belum di-refactor ke UserPreferences
     var authToken: String = ""

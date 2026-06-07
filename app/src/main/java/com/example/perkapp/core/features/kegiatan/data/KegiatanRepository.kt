@@ -177,7 +177,8 @@ class KegiatanRepositoryImpl(
                             // Synced tools
                             kegDto.alats?.forEach { alatDto ->
                                 val localTool = alatDao.getAlatById(alatDto.id)
-                                val toolImagePath = localTool?.image_path ?: alatDto.image_path
+                                val serverImagePath = alatDto.images?.firstOrNull()?.image_url ?: alatDto.image_path
+                                val toolImagePath = localTool?.image_path ?: serverImagePath
                                 val kaEntity = KegiatanAlatEntity(
                                     id = "${kegDto.id}_${alatDto.id}",
                                     kegiatanId = kegDto.id,

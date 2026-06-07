@@ -39,12 +39,17 @@ class AlatRepository(
                         val entities = alatList.map { item ->
                             val existing = dao.getAlatById(item.id)
                             var imagePath = existing?.image_path
-                            if (imagePath.isNullOrBlank()) {
+                            
+                            val serverImage = item.images?.firstOrNull()?.image_url
+                            if (!serverImage.isNullOrBlank()) {
+                                imagePath = serverImage
+                            } else if (imagePath.isNullOrBlank()) {
                                 val images = imageDao.getImagesForEntity("alat", item.id)
                                 if (images.isNotEmpty()) {
                                     imagePath = images.first().image_url ?: images.first().local_path
                                 }
                             }
+                            
                             AlatEntity(
                                 id = item.id,
                                 name = item.name,
@@ -258,11 +263,6 @@ class AlatRepository(
                                             val updatedImg = img.copy(entity_id = apiAlat.id)
                                             imageDao.insertImage(updatedImg)
                                         }
-
-                                        // trigger immediate image sync if there are pending images
-                                        val mediaApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.media.api.MediaApiService::class.java)
-                                        val mediaRepository = com.example.perkapp.features.media.data.MediaRepository(mediaApi, imageDao, context)
-                                        mediaRepository.syncPendingImages()
                                     } catch (e: Exception) {
                                         e.printStackTrace()
                                     }
@@ -302,6 +302,20 @@ class AlatRepository(
                     allSuccess = false
                 }
             }
+            
+            // Sync all pending images at the end of alat sync
+            try {
+                val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
+                val mediaApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.media.api.MediaApiService::class.java)
+                val mediaRepository = com.example.perkapp.features.media.data.MediaRepository(mediaApi, db.imageDao(), context)
+                if (!mediaRepository.syncPendingImages()) {
+                    allSuccess = false
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                allSuccess = false
+            }
+            
             allSuccess
         }
     }

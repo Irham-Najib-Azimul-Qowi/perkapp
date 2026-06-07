@@ -33,11 +33,6 @@ class MediaRepository(
             sync_status = "pending"
         )
         dao.insertImage(entity)
-
-        // Coba upload langsung jika online
-        if (NetworkUtils.isOnline(context)) {
-            tryUploadImage(entity)
-        }
     }
 
     /**

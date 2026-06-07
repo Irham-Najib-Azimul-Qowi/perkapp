@@ -18,6 +18,7 @@ data class AlatPivotResponse(
     val name: String,
     val category: String,
     val image_path: String?,
+    val images: List<com.example.perkapp.features.alat.data.remote.ImageResponse>? = null,
     val pivot: PivotQty?
 )
 
