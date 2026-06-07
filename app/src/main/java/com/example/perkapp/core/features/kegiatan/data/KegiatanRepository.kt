@@ -505,9 +505,24 @@ class KegiatanRepositoryImpl(
                         success = false
                     }
                 } else if (keg.pending_action == "delete") {
+                    try {
+                        val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}\nDeskripsi: ${keg.deskripsi}"
+                        apiService.updateKegiatan(
+                            id = keg.id,
+                            request = UpdateKegiatanRequest(
+                                name = keg.judul,
+                                description = desc,
+                                date = formatToLaravelDate(keg.tanggal),
+                                status = "deleted"
+                            )
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                     val response = apiService.deleteKegiatan(keg.id)
                     if (response.success) {
                         dao.deleteKegiatan(keg.id)
+                        dao.deleteKegiatanAlatForKegiatan(keg.id)
                     } else {
                         success = false
                     }
@@ -573,6 +588,7 @@ class KegiatanRepositoryImpl(
         val db = AppDatabase.getDatabase(context)
         val alatDao = db.alatDao()
         val kegiatanAlatList = dao.getAlatForKegiatan(kegiatanId)
+        val existing = dao.getKegiatanById(kegiatanId)
         
         for (ka in kegiatanAlatList) {
             if (!ka.isExternal && !ka.isReturned) {
@@ -584,15 +600,40 @@ class KegiatanRepositoryImpl(
             }
         }
         
-        dao.deleteKegiatan(kegiatanId)
-        dao.deleteKegiatanAlatForKegiatan(kegiatanId)
+        // Mark as pending delete instead of deleting locally immediately to ensure sync works if offline
+        if (existing != null) {
+            val deletedEntity = existing.copy(
+                status = "DELETED",
+                sync_status = "pending",
+                pending_action = "delete"
+            )
+            dao.updateKegiatan(deletedEntity)
+        }
 
         if (NetworkUtils.isOnline(context)) {
             try {
-                apiService.deleteKegiatan(kegiatanId)
+                if (existing != null) {
+                    // Update status to 'deleted' first on the server.
+                    // This is a workaround for the backend soft-delete issue where soft-deleted items 
+                    // still appear for other users and jump to the top. Changing status hides it.
+                    val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nDeskripsi: ${existing.deskripsi}"
+                    apiService.updateKegiatan(
+                        id = kegiatanId,
+                        request = UpdateKegiatanRequest(
+                            name = existing.judul,
+                            description = desc,
+                            date = formatToLaravelDate(existing.tanggal),
+                            status = "deleted"
+                        )
+                    )
+                }
+                val response = apiService.deleteKegiatan(kegiatanId)
+                if (response.success) {
+                    dao.deleteKegiatan(kegiatanId)
+                    dao.deleteKegiatanAlatForKegiatan(kegiatanId)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                // Mark deleted locally and pending delete on server (we already deleted locally, so in Room it's gone)
             }
         }
     }
