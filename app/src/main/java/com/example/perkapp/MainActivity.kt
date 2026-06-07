@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             if (com.example.perkapp.core.utils.NetworkUtils.isOnline(applicationContext)) {
                 RetrofitClient.performSilentLogin(applicationContext)
+                SyncManager.syncNow(applicationContext)
             }
         }
 

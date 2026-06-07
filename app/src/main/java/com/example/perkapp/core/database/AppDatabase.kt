@@ -7,21 +7,28 @@ import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.perkapp.core.database.dao.UserDao
+import com.example.perkapp.core.database.dao.KegiatanDao
 import com.example.perkapp.core.database.entity.UserEntity
+import com.example.perkapp.core.database.entity.KegiatanEntity
+import com.example.perkapp.core.database.entity.KegiatanAlatEntity
+import com.example.perkapp.core.database.entity.RegisteredUserEntity
+import com.example.perkapp.core.database.dao.RegisteredUserDao
 import com.example.perkapp.features.alat.data.local.AlatDao
 import com.example.perkapp.features.alat.data.local.AlatEntity
 import com.example.perkapp.features.media.data.ImageDao
 import com.example.perkapp.features.media.data.ImageEntity
 
 @Database(
-    entities = [UserEntity::class, AlatEntity::class, ImageEntity::class],
-    version = 2,
+    entities = [UserEntity::class, AlatEntity::class, ImageEntity::class, KegiatanEntity::class, KegiatanAlatEntity::class, RegisteredUserEntity::class],
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
+    abstract fun registeredUserDao(): RegisteredUserDao
     abstract fun alatDao(): AlatDao
     abstract fun imageDao(): ImageDao
+    abstract fun kegiatanDao(): KegiatanDao
 
     companion object {
         @Volatile

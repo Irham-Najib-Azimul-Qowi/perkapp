@@ -31,4 +31,7 @@ interface AuthApiService {
 
     @GET("auth/me")
     suspend fun getProfile(): ApiResponse<UserDto>
+
+    @GET("users")
+    suspend fun getAllUsers(): ApiResponse<List<UserDto>>
 }

@@ -1,7 +1,7 @@
 package com.example.perkapp.features.kegiatan.ui
 
-// Mengimpor komponen dan fungsi Android/Compose yang dibutuhkan untuk membangun antarmuka pengguna
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,101 +26,111 @@ import com.example.perkapp.features.kegiatan.domain.HomeUiState
 import com.example.perkapp.features.kegiatan.domain.Kegiatan
 import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 
-/**
- * Composable utama untuk halaman Home.
- * Tampilan disederhanakan hanya memuat judul "SIEPERKAP" dan daftar kegiatan yang sedang aktif (berlangsung).
- *
- * @param navController Pengontrol navigasi untuk berpindah halaman.
- * @param viewModel ViewModel penyedia data dan logika halaman Home.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen( 
     navController: NavController,
-    viewModel: HomeViewModel = viewModel(), // Inisialisasi ViewModel secara default
+    viewModel: HomeViewModel = viewModel(),
     onNavigateToActivities: () -> Unit = {},
     onNavigateToInventory: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToBorrow: () -> Unit = {},
-    onNavigateToLogActivity: () -> Unit = {}
+    onNavigateToLogActivity: () -> Unit = {},
+    onDetailClick: (String) -> Unit = {}
 ) {
-    // Mengobservasi state UI dari ViewModel secara aman berdasarkan daur hidup (lifecycle)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Menggunakan Box sebagai wadah utama dengan padding sistem bar agar tidak tertutup notch/kamera
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8F9FF)) // Mengatur warna latar belakang abu-biru sangat muda
-            .systemBarsPadding() // Otomatis menambahkan padding agar tidak bertabrakan dengan status bar / navigasi bar bawah
-    ) {
-        when {
-            // Jika statusnya sedang memuat data dari server/lokal
-            uiState.isLoading -> {
-                CircularProgressIndicator(
-                    color = HijauUtama,
-                    modifier = Modifier.align(Alignment.Center) // Indikator berada tepat di tengah layar
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "perkapp",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White
                 )
-            }
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when {
+                uiState.isLoading -> {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
 
-            // Jika terjadi kegagalan pemuatan data
-            uiState.errorMessage != null -> {
-                Column(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Menampilkan teks deskripsi error
-                    Text(uiState.errorMessage!!, color = Color.Red)
-                    Spacer(Modifier.height(8.dp)) // Jarak spasi vertikal
-                    // Tombol untuk mencoba memuat ulang data
-                    Button(onClick = { viewModel.muatDataHome() }) {
-                        Text("Coba Lagi")
+                uiState.errorMessage != null -> {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(uiState.errorMessage!!, color = Color.Red)
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.muatDataHome() },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Coba Lagi")
+                        }
                     }
                 }
-            }
 
-            // Jika data berhasil dimuat dengan sukses
-            else -> {
-                // Merender tata letak konten utama halaman Home (hanya Judul + Kegiatan Aktif)
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 20.dp), // Padding sekeliling halaman
-                    verticalArrangement = Arrangement.spacedBy(16.dp) // Jarak antar elemen vertikal
-                ) {
-                    // Judul utama aplikasi "SIEPERKAP"
-                    Text(
-                        text = "SIEPERKAP",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = HijauUtama, // Warna hijau utama
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    // Kolom scroll berisi daftar kegiatan yang sedang aktif/berlangsung
+                else -> {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f) // Mengambil sisa ruang layar
-                            .verticalScroll(rememberScrollState()), // Mengaktifkan scroll vertikal
-                        verticalArrangement = Arrangement.spacedBy(16.dp) // Jarak antar kartu kegiatan
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Menyaring data kegiatan dari repositori agar HANYA status AKTIF yang ditampilkan
-                        val kegiatanBerlangsung = uiState.kegiatanAktif.filter { 
-                            it.statusType == StatusKegiatan.AKTIF 
-                        }
+                        Text(
+                            text = "Kegiatan Berlangsung",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
 
-                        if (kegiatanBerlangsung.isEmpty()) {
-                            // Teks keterangan jika tidak ada kegiatan aktif yang sedang berjalan
-                            Text(
-                                text = "Tidak ada aktivitas berlangsung saat ini.",
-                                color = Color.Gray,
-                                fontSize = 14.sp
-                            )
-                        } else {
-                            // Melakukan perulangan untuk merender masing-masing kartu kegiatan yang aktif
-                            kegiatanBerlangsung.forEach { kegiatan ->
-                                KartuKegiatan(kegiatan = kegiatan)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            val kegiatanBerlangsung = uiState.kegiatanAktif.filter { 
+                                it.statusType == StatusKegiatan.AKTIF 
+                            }
+
+                            if (kegiatanBerlangsung.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Tidak ada aktivitas berlangsung saat ini.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                kegiatanBerlangsung.forEach { kegiatan ->
+                                    KartuKegiatan(
+                                        kegiatan = kegiatan,
+                                        onClick = { onDetailClick(kegiatan.id) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -130,85 +140,96 @@ fun HomeScreen(
     }
 }
 
-/**
- * Komponen kartu individual kegiatan dengan bar progres dan aksen garis warna di bagian bawah.
- *
- * @param kegiatan Objek data kegiatan yang akan digambar di kartu.
- */
 @Composable
-fun KartuKegiatan(kegiatan: Kegiatan) {
-    // Menentukan warna aksen secara dinamis berdasarkan nilai enum StatusKegiatan
-    val warnaBorder = when (kegiatan.statusType) {
-        StatusKegiatan.AKTIF        -> HijauUtama            // Hijau untuk aktif
-        StatusKegiatan.MAINTENANCE  -> Color(0xFFFF8B7C)     // Oranye untuk pemeliharaan
-        StatusKegiatan.AUDIT        -> Color(0xFF6D7B6C)     // Abu-abu untuk audit
-    }
-
-    Surface(
-        shape         = RoundedCornerShape(16.dp),
-        color         = Color(0xFFF8F9FF),
-        shadowElevation = 2.dp,
-        modifier      = Modifier.fillMaxWidth() // Lebar kartu penuh menyesuaikan layar
+fun KartuKegiatan(
+    kegiatan: Kegiatan,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Box {
-            Column(
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Baris atas: Kategori kegiatan di kiri
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (kegiatan.statusType == StatusKegiatan.AKTIF) HijauMuda else Color(0xFFD9E3F6)
-                    ) {
-                        Text(
-                            text     = kegiatan.kategori,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 11.sp,
-                            color    = if (kegiatan.statusType == StatusKegiatan.AKTIF) Color(0xFF007230) else Color(0xFF3D4A3D)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Info Column
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = kegiatan.judul,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = if (kegiatan.statusType == StatusKegiatan.AKTIF) MaterialTheme.colorScheme.primaryContainer else Color(0xFFD9E3F6),
+                            shape = RoundedCornerShape(8.dp)
                         )
-                    }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = kegiatan.kategori,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (kegiatan.statusType == StatusKegiatan.AKTIF) MaterialTheme.colorScheme.primary else Color(0xFF3D4A3D)
+                    )
                 }
 
-                // Nama atau Judul kegiatan
-                Text(kegiatan.judul, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF121C2A))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Baris Lokasi (Ikon Map pin + Nama tempat)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Outlined.LocationOn,
                         contentDescription = null,
-                        tint = Color(0xFF3D4A3D),
-                        modifier = Modifier.size(18.dp)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
-                    Text(kegiatan.lokasi, fontSize = 14.sp, color = Color(0xFF3D4A3D))
+                    Text(
+                        text = kegiatan.lokasi,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val isAktif = kegiatan.statusType == StatusKegiatan.AKTIF
+                val bannerColor = if (kegiatan.isPending) Color(0xFFFFF3CD) else if (isAktif) Color(0xFFE8F5E9) else Color(0xFFFFF3CD)
+                val bannerTextColor = if (kegiatan.isPending) Color(0xFF856404) else if (isAktif) Color(0xFF2E7D32) else Color(0xFF856404)
+                val bannerText = if (kegiatan.isPending) "Pending (Menunggu Sinkronisasi)" else if (isAktif) "Kegiatan Berlangsung" else "Maintenance / Audit Kegiatan"
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            color = bannerColor,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = bannerText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = bannerTextColor
+                    )
                 }
             }
-
-            // Garis pembatas warna-warni di bagian paling bawah kartu
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .background(warnaBorder)
-            )
         }
     }
-}
-
-// Konstanta warna hijau utama
-val HijauUtama = Color(0xFF006E2F)  
-// Konstanta warna hijau muda
-val HijauMuda  = Color(0xFF7CF994)  
-
-// Preview untuk mendemonstrasikan rancangan antarmuka HomeScreen di IDE Android Studio
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview(){
-    HomeScreen(navController = rememberNavController())
 }

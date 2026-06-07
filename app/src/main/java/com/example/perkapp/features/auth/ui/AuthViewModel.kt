@@ -26,6 +26,13 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     val registerState: StateFlow<AuthState> = _registerState.asStateFlow()
 
     val currentUser = repository.getCurrentUser()
+    val authToken = repository.authTokenFlow
+
+    init {
+        viewModelScope.launch {
+            repository.refreshProfileIfNeeded()
+        }
+    }
 
     fun login(request: LoginRequest) {
         viewModelScope.launch {

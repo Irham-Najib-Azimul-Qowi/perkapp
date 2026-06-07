@@ -41,11 +41,19 @@ object SyncManager {
             )
     }
 
-    /**
-     * Jalankan sync segera (tanpa menunggu).
-     * Tetap membutuhkan koneksi internet.
-     */
     fun syncNow(context: Context) {
-        scheduleSyncWhenOnline(context)
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                10, TimeUnit.SECONDS
+            )
+            .build()
+
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(
+                SyncWorker.WORK_NAME + "_now",
+                ExistingWorkPolicy.REPLACE,
+                syncRequest
+            )
     }
 }

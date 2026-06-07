@@ -1,5 +1,6 @@
 package com.example.perkapp.core.navigation
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -14,8 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.perkapp.core.database.AppDatabase
 import com.example.perkapp.core.network.RetrofitClient
-import com.example.perkapp.core.features.kegiatan.ui.AktivitasScreen
-import com.example.perkapp.core.features.kegiatan.ui.TambahKegiatanScreen
+import com.example.perkapp.core.features.kegiatan.ui.*
 import com.example.perkapp.features.alat.api.AlatApiService
 import com.example.perkapp.features.alat.data.repository.AlatRepository
 import com.example.perkapp.features.alat.ui.screen.DetailAlatScreen
@@ -112,7 +112,7 @@ fun SetupNavGraph(
 
         // --- BAGIAN REJA (KEGIATAN) ---
         composable(route = Screen.Home.route) {
-            val repository = remember { FakeKegiatanRepository() }
+            val repository = remember { FakeKegiatanRepository(context) }
             val homeViewModel: HomeViewModel = viewModel(
                 factory = HomeViewModel.HomeViewModelFactory(repository)
             )
@@ -125,6 +125,9 @@ fun SetupNavGraph(
                 },
                 onNavigateToInventory = {
                     navController.navigate(Screen.Inventaris.route)
+                },
+                onDetailClick = { id ->
+                    navController.navigate(Screen.DetailKegiatan.createRoute(id))
                 }
             )
         }
@@ -141,7 +144,49 @@ fun SetupNavGraph(
         }
 
         composable(route = Screen.TambahKegiatan.route) {
-            TambahKegiatanScreen(navController = navController)
+            TambahKegiatanScreen(
+                navController = navController,
+                viewModel = alatViewModel
+            )
+        }
+
+        composable(
+            route = Screen.DetailKegiatan.route,
+            arguments = listOf(
+                navArgument("id") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: ""
+            DetailKegiatanScreen(
+                kegiatanId = id,
+                onBack = { navController.popBackStack() },
+                onEditClick = { kegiatanId ->
+                    navController.navigate(Screen.EditKegiatan.createRoute(kegiatanId))
+                },
+                onDeleteSuccess = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.EditKegiatan.route,
+            arguments = listOf(
+                navArgument("id") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: ""
+            EditKegiatanScreen(
+                kegiatanId = id,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(route = Screen.TambahAlatLuar.route) {
+            TambahAlatLuarScreen(
+                navController = navController,
+                onBack = { navController.popBackStack() }
+            )
         }
 
         // --- BAGIAN NAJIB (ALAT / INVENTARIS) ---
@@ -153,6 +198,9 @@ fun SetupNavGraph(
                 },
                 onItemClick = { id ->
                     navController.navigate(Screen.DetailAlat.createRoute(id))
+                },
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -179,8 +227,16 @@ fun SetupNavGraph(
                     navController.navigate(Screen.EditAlat.createRoute(id))
                 },
                 onDeleteClick = { id ->
-                    alatViewModel.deleteAlat(id)
-                    navController.popBackStack()
+                    alatViewModel.deleteAlat(
+                        id = id,
+                        onSuccess = {
+                            Toast.makeText(context, "Alat berhasil dihapus!", Toast.LENGTH_SHORT).show()
+                            navController.popBackStack()
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                        }
+                    )
                 }
             )
         }

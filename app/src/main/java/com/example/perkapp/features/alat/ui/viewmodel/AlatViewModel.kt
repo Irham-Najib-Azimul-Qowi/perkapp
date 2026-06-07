@@ -20,10 +20,39 @@ class AlatViewModel(
     val isLoading = MutableLiveData(false)
     val errorMessage = MutableLiveData<String?>()
 
+    init {
+        getAllAlat()
+        observeNetworkChanges()
+    }
+
+    private fun observeNetworkChanges() {
+        viewModelScope.launch {
+            com.example.perkapp.core.utils.NetworkUtils.observeNetworkStatus(application)
+                .collect { isOnline ->
+                    if (isOnline) {
+                        try {
+                            repository.syncPendingData()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        } finally {
+                            getAllAlat()
+                        }
+                    }
+                }
+        }
+    }
+
     fun getAllAlat() {
         viewModelScope.launch {
             isLoading.value = true
             try {
+                if (com.example.perkapp.core.utils.NetworkUtils.isOnline(application)) {
+                    try {
+                        repository.syncPendingData()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
                 alatList.value = repository.getAllAlat()
             } catch (e: Exception) {
                 errorMessage.value = e.message
@@ -34,6 +63,7 @@ class AlatViewModel(
     }
 
     fun createAlat(name: String, category: String, totalQty: Int, condition: String, imagePath: String?) {
+        if (isLoading.value == true) return
         viewModelScope.launch {
             isLoading.value = true
             try {
@@ -71,15 +101,24 @@ class AlatViewModel(
         }
     }
 
-    fun deleteAlat(id: String) {
+    fun deleteAlat(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             isLoading.value = true
             try {
+                // Cek apakah alat sedang dipinjam oleh kegiatan
+                val db = com.example.perkapp.core.database.AppDatabase.getDatabase(application)
+                val borrowings = db.kegiatanDao().getActiveBorrowingsForAlat(id)
+                if (borrowings.isNotEmpty()) {
+                    throw Exception("Alat sedang dipinjam oleh kegiatan dan tidak bisa dihapus!")
+                }
+
                 repository.deleteAlat(id)
                 // Jadwalkan sync jika ada data pending
                 SyncManager.scheduleSyncWhenOnline(application)
+                onSuccess()
             } catch (e: Exception) {
                 errorMessage.value = e.message
+                onError(e.message ?: "Gagal menghapus alat")
             } finally {
                 getAllAlat()
                 isLoading.value = false

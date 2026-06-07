@@ -14,7 +14,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL = "https://api.perkapp.com/v1/"
+    private const val BASE_URL = "http://127.0.0.1:8000/api/v1/"
 
     // Digunakan oleh fitur Alat/Media yang belum di-refactor ke UserPreferences
     var authToken: String = ""
@@ -56,8 +56,21 @@ object RetrofitClient {
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .addHeader("Accept", "application/json")
-                if (authToken.isNotBlank()) {
-                    request.addHeader("Authorization", "Bearer $authToken")
+                
+                var token = authToken
+                try {
+                    val context = com.example.perkapp.PerkappApplication.instance
+                    val prefs = UserPreferences(context.dataStore)
+                    val flowToken = runBlocking { prefs.getAuthToken.first() }
+                    if (!flowToken.isNullOrBlank()) {
+                        token = flowToken
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                if (token.isNotBlank()) {
+                    request.addHeader("Authorization", "Bearer $token")
                 }
                 chain.proceed(request.build())
             }
@@ -94,7 +107,7 @@ object RetrofitClient {
             try {
                 val loginClient = OkHttpClient.Builder().build()
                 val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
-                val jsonBody = "{\"email\":\"test@test.com\",\"password\":\"password123\"}"
+                val jsonBody = "{\"email\":\"admin.perkapp@cakramanggala.com\",\"password\":\"perkapp123\"}"
                 val body = jsonBody.toRequestBody(mediaType)
                 val request = okhttp3.Request.Builder()
                     .url(BASE_URL + "auth/login")
@@ -103,24 +116,29 @@ object RetrofitClient {
                     .build()
 
                 val response = loginClient.newCall(request).execute()
+                android.util.Log.d("RetrofitClient", "performSilentLogin response code: ${response.code}")
                 if (response.isSuccessful) {
                     val responseBody = response.body?.string()
+                    android.util.Log.d("RetrofitClient", "performSilentLogin responseBody: $responseBody")
                     if (responseBody != null) {
                         val jsonObject = org.json.JSONObject(responseBody)
                         if (jsonObject.getBoolean("success")) {
                             val dataObject = jsonObject.getJSONObject("data")
                             val token = dataObject.getString("token")
                             authToken = token
+                            android.util.Log.d("RetrofitClient", "performSilentLogin success, token: $token")
                             // Simpan juga ke userPreferences agar ter-sync
                             val userPrefs = UserPreferences(context.dataStore)
                             userPrefs.saveAuthToken(token)
                             return@withContext true
                         }
                     }
+                } else {
+                    android.util.Log.e("RetrofitClient", "performSilentLogin failed: ${response.message}")
                 }
                 false
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("RetrofitClient", "performSilentLogin exception", e)
                 false
             }
         }

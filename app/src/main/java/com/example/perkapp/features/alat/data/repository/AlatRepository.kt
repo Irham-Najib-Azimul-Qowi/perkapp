@@ -7,12 +7,17 @@ import com.example.perkapp.features.alat.data.local.AlatDao
 import com.example.perkapp.features.alat.data.local.AlatEntity
 import com.example.perkapp.features.alat.data.remote.CreateAlatRequest
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AlatRepository(
     private val api: AlatApiService,
     private val dao: AlatDao,
     private val context: Context
 ) {
+    companion object {
+        private val syncMutex = Mutex()
+    }
     /**
      * Ambil semua alat.
      * - Jika online: fetch dari API, simpan ke local, lalu kembalikan dari local
@@ -108,7 +113,7 @@ class AlatRepository(
         )
         dao.insertAlat(localEntity)
 
-        // Simpan gambar secara lokal (dan coba upload langsung jika online)
+        // Simpan gambar secara lokal
         if (!imagePath.isNullOrBlank()) {
             try {
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
@@ -123,50 +128,8 @@ class AlatRepository(
 
         if (NetworkUtils.isOnline(context)) {
             try {
-                val request = CreateAlatRequest(name, category, totalQty, condition)
-                val response = api.createAlat(request)
-                if (response.isSuccessful) {
-                    response.body()?.data?.let { apiAlat ->
-                        // Hapus entri lokal dan ganti dengan data dari server
-                        dao.deleteAlat(localId)
-                        dao.insertAlat(
-                            AlatEntity(
-                                id = apiAlat.id,
-                                name = apiAlat.name,
-                                category = apiAlat.category,
-                                total_qty = apiAlat.total_qty,
-                                available_qty = apiAlat.available_qty,
-                                condition = apiAlat.condition,
-                                sync_status = "synced",
-                                image_path = imagePath,
-                                pending_action = null
-                            )
-                        )
-
-                        // Update entityId gambar di Room dari localId ke server ID
-                        try {
-                            val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
-                            val imageDao = db.imageDao()
-                            val localImages = imageDao.getImagesForEntity("alat", localId)
-                            for (img in localImages) {
-                                imageDao.deleteImage(img.id)
-                                val updatedImg = img.copy(entity_id = apiAlat.id)
-                                imageDao.insertImage(updatedImg)
-
-                                // Coba upload ulang dengan server ID yang benar
-                                if (updatedImg.sync_status == "pending") {
-                                    val mediaApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.media.api.MediaApiService::class.java)
-                                    val mediaRepository = com.example.perkapp.features.media.data.MediaRepository(mediaApi, imageDao, context)
-                                    mediaRepository.syncPendingImages()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    }
-                }
+                syncPendingData()
             } catch (e: Exception) {
-                // Gagal sync - data tetap tersimpan lokal dengan status pending
                 e.printStackTrace()
             }
         }
@@ -191,7 +154,7 @@ class AlatRepository(
         )
         dao.updateAlat(updated)
 
-        // Simpan gambar secara lokal jika baru (dan coba upload langsung jika online)
+        // Simpan gambar secara lokal jika baru
         if (!request.image_path.isNullOrBlank() && request.image_path != alat.image_path) {
             try {
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
@@ -206,10 +169,7 @@ class AlatRepository(
 
         if (NetworkUtils.isOnline(context)) {
             try {
-                val response = api.updateAlat(alat.id, request)
-                if (response.isSuccessful) {
-                    dao.updateAlat(updated.copy(sync_status = "synced", pending_action = null))
-                }
+                syncPendingData()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -222,19 +182,6 @@ class AlatRepository(
      * - Jika offline: tandai sebagai pending delete (soft delete), nanti di-sync
      */
     suspend fun deleteAlat(id: String) {
-        if (NetworkUtils.isOnline(context)) {
-            try {
-                val response = api.deleteAlat(id)
-                if (response.isSuccessful) {
-                    dao.deleteAlat(id)
-                    return
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        // Offline atau gagal delete dari API: soft delete
         val existing = dao.getAlatById(id)
         if (existing != null) {
             if (existing.pending_action == "create") {
@@ -250,6 +197,14 @@ class AlatRepository(
                 )
             }
         }
+
+        if (NetworkUtils.isOnline(context)) {
+            try {
+                syncPendingData()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     suspend fun getAlatById(id: String): AlatEntity? {
@@ -261,86 +216,93 @@ class AlatRepository(
      * Dipanggil oleh SyncWorker saat ada koneksi internet.
      */
     suspend fun syncPendingData(): Boolean {
-        val pendingItems = dao.getPendingAlat()
-        var allSuccess = true
+        return syncMutex.withLock {
+            val pendingItems = dao.getPendingAlat()
+            var allSuccess = true
 
-        for (item in pendingItems) {
-            try {
-                when (item.pending_action) {
-                    "create" -> {
-                        val request = CreateAlatRequest(
-                            name = item.name,
-                            category = item.category,
-                            total_qty = item.total_qty,
-                            condition = item.condition
-                        )
-                        val response = api.createAlat(request)
-                        if (response.isSuccessful) {
-                            response.body()?.data?.let { apiAlat ->
-                                dao.deleteAlat(item.id)
-                                dao.insertAlat(
-                                    AlatEntity(
-                                        id = apiAlat.id,
-                                        name = apiAlat.name,
-                                        category = apiAlat.category,
-                                        total_qty = apiAlat.total_qty,
-                                        available_qty = apiAlat.available_qty,
-                                        condition = apiAlat.condition,
-                                        sync_status = "synced",
-                                        image_path = item.image_path,
-                                        pending_action = null
-                                    )
-                                )
-
-                                // Update entityId gambar di Room dari localId ke server ID
-                                try {
-                                    val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
-                                    val imageDao = db.imageDao()
-                                    val localImages = imageDao.getImagesForEntity("alat", item.id)
-                                    for (img in localImages) {
-                                        imageDao.deleteImage(img.id)
-                                        val updatedImg = img.copy(entity_id = apiAlat.id)
-                                        imageDao.insertImage(updatedImg)
-                                    }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        } else {
-                            allSuccess = false
-                        }
-                    }
-                    "update" -> {
-                        val request = CreateAlatRequest(
-                            name = item.name,
-                            category = item.category,
-                            total_qty = item.total_qty,
-                            condition = item.condition,
-                            image_path = item.image_path
-                        )
-                        val response = api.updateAlat(item.id, request)
-                        if (response.isSuccessful) {
-                            dao.updateAlat(
-                                item.copy(sync_status = "synced", pending_action = null)
+            for (item in pendingItems) {
+                try {
+                    when (item.pending_action) {
+                        "create" -> {
+                            val request = CreateAlatRequest(
+                                name = item.name,
+                                category = item.category,
+                                total_qty = item.total_qty,
+                                condition = item.condition
                             )
-                        } else {
-                            allSuccess = false
+                            val response = api.createAlat(request)
+                            if (response.isSuccessful) {
+                                response.body()?.data?.let { apiAlat ->
+                                    dao.deleteAlat(item.id)
+                                    dao.insertAlat(
+                                        AlatEntity(
+                                            id = apiAlat.id,
+                                            name = apiAlat.name,
+                                            category = apiAlat.category,
+                                            total_qty = apiAlat.total_qty,
+                                            available_qty = apiAlat.available_qty,
+                                            condition = apiAlat.condition,
+                                            sync_status = "synced",
+                                            image_path = item.image_path,
+                                            pending_action = null
+                                        )
+                                    )
+
+                                    // Update entityId gambar di Room dari localId ke server ID
+                                    try {
+                                        val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
+                                        val imageDao = db.imageDao()
+                                        val localImages = imageDao.getImagesForEntity("alat", item.id)
+                                        for (img in localImages) {
+                                            imageDao.deleteImage(img.id)
+                                            val updatedImg = img.copy(entity_id = apiAlat.id)
+                                            imageDao.insertImage(updatedImg)
+                                        }
+
+                                        // trigger immediate image sync if there are pending images
+                                        val mediaApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.media.api.MediaApiService::class.java)
+                                        val mediaRepository = com.example.perkapp.features.media.data.MediaRepository(mediaApi, imageDao, context)
+                                        mediaRepository.syncPendingImages()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                            } else {
+                                allSuccess = false
+                            }
+                        }
+                        "update" -> {
+                            val request = CreateAlatRequest(
+                                name = item.name,
+                                category = item.category,
+                                total_qty = item.total_qty,
+                                condition = item.condition,
+                                image_path = item.image_path
+                            )
+                            val response = api.updateAlat(item.id, request)
+                            if (response.isSuccessful) {
+                                dao.updateAlat(
+                                    item.copy(sync_status = "synced", pending_action = null)
+                                )
+                            } else {
+                                allSuccess = false
+                            }
+                        }
+                        "delete" -> {
+                            val response = api.deleteAlat(item.id)
+                            if (response.isSuccessful) {
+                                dao.deleteAlat(item.id)
+                            } else {
+                                allSuccess = false
+                            }
                         }
                     }
-                    "delete" -> {
-                        val response = api.deleteAlat(item.id)
-                        if (response.isSuccessful) {
-                            dao.deleteAlat(item.id)
-                        } else {
-                            allSuccess = false
-                        }
-                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    allSuccess = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                allSuccess = false
             }
+            allSuccess
         }
-        return allSuccess
     }
 }

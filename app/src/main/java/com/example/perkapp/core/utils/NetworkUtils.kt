@@ -12,19 +12,52 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 
 object NetworkUtils {
 
+    private fun isServerReachable(): Boolean {
+        var reachable = false
+        val thread = Thread {
+            try {
+                val socket = java.net.Socket()
+                socket.connect(java.net.InetSocketAddress("127.0.0.1", 8000), 1000)
+                socket.close()
+                reachable = true
+                android.util.Log.d("NetworkUtils", "isServerReachable: true")
+            } catch (e: Exception) {
+                android.util.Log.d("NetworkUtils", "isServerReachable failed: ${e.message}")
+                reachable = false
+            }
+        }
+        thread.start()
+        try {
+            thread.join(1200)
+        } catch (e: Exception) {
+            android.util.Log.e("NetworkUtils", "Thread join interrupted", e)
+        }
+        android.util.Log.d("NetworkUtils", "isServerReachable final: $reachable")
+        return reachable
+    }
+
     /**
      * Cek apakah perangkat sedang terhubung ke internet
      */
     fun isOnline(context: Context): Boolean {
-        return try {
+        val systemOnline = try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val network = cm.activeNetwork ?: return false
-            val capabilities = cm.getNetworkCapabilities(network) ?: return false
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            val network = cm.activeNetwork
+            if (network != null) {
+                val capabilities = cm.getNetworkCapabilities(network)
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            } else {
+                false
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
             false
         }
+
+        android.util.Log.d("NetworkUtils", "isOnline systemOnline: $systemOnline")
+        if (systemOnline) return true
+        val reachable = isServerReachable()
+        android.util.Log.d("NetworkUtils", "isOnline final: $reachable")
+        return reachable
     }
 
     /**
@@ -36,7 +69,11 @@ object NetworkUtils {
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                trySend(true)
+                trySend(isOnline(context))
+            }
+
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                trySend(isOnline(context))
             }
 
             override fun onLost(network: Network) {
@@ -48,11 +85,14 @@ object NetworkUtils {
             }
         }
 
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-
-        cm.registerNetworkCallback(request, callback)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            cm.registerDefaultNetworkCallback(callback)
+        } else {
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(request, callback)
+        }
 
         // Emit status awal
         trySend(isOnline(context))

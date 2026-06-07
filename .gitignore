@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Temporary and build files
+.kotlin/
+*.log
+/perkapp_database*
+/perkapp_db_copied
+/build_output.txt
+*.docx

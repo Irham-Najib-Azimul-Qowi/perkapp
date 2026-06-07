@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.perkapp.core.database.AppDatabase
 import com.example.perkapp.core.network.RetrofitClient
+import com.example.perkapp.core.datastore.dataStore
 import com.example.perkapp.features.alat.api.AlatApiService
 import com.example.perkapp.features.alat.data.repository.AlatRepository
 import com.example.perkapp.features.media.api.MediaApiService
@@ -22,22 +23,28 @@ class SyncWorker(
     override suspend fun doWork(): Result {
         val database = AppDatabase.getDatabase(applicationContext)
 
-        // Lakukan silent login sebelum sinkronisasi agar semua request terautentikasi
-        RetrofitClient.performSilentLogin(applicationContext)
+        val userPrefs = com.example.perkapp.core.datastore.UserPreferences(applicationContext.dataStore)
+        val retrofit = RetrofitClient.getClient(userPrefs)
 
         // Sync Alat data
-        val alatApi = RetrofitClient.instance.create(AlatApiService::class.java)
+        val alatApi = retrofit.create(AlatApiService::class.java)
         val alatDao = database.alatDao()
         val alatRepository = AlatRepository(alatApi, alatDao, applicationContext)
         val alatSuccess = alatRepository.syncPendingData()
 
+        // Sync Kegiatan data
+        val kegiatanApi = retrofit.create(com.example.perkapp.features.kegiatan.api.KegiatanApiService::class.java)
+        val kegiatanDao = database.kegiatanDao()
+        val kegiatanRepository = com.example.perkapp.features.kegiatan.data.KegiatanRepositoryImpl(kegiatanApi, kegiatanDao, applicationContext)
+        val kegiatanSuccess = kegiatanRepository.syncPendingKegiatan()
+
         // Sync Images
-        val mediaApi = RetrofitClient.instance.create(MediaApiService::class.java)
+        val mediaApi = retrofit.create(MediaApiService::class.java)
         val imageDao = database.imageDao()
         val mediaRepository = MediaRepository(mediaApi, imageDao, applicationContext)
         val imageSuccess = mediaRepository.syncPendingImages()
 
-        return if (alatSuccess && imageSuccess) {
+        return if (alatSuccess && imageSuccess && kegiatanSuccess) {
             Result.success()
         } else {
             // Retry nanti jika ada yang gagal

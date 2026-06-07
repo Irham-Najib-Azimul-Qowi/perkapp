@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ data class Aktivitas(
     val status: StatusAktivitas, // Status pengerjaan saat ini
     val progress: Float, // Progres pengerjaan (0.0f - 1.0f)
     val tanggal: String, // Informasi tanggal atau status langsung
+    val isPending: Boolean = false // Status sync
 )
 
 /**
@@ -57,23 +59,41 @@ fun AktivitasScreen(
 
     // Scaffold menyediakan struktur dasar halaman Material 3
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "Aktivitas Kegiatan",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White
+                )
+            )
+        },
         floatingActionButton = {
             // Tombol melayang di pojok kanan bawah (+) berwarna hijau cerah dengan ikon plus hitam
             FloatingActionButton(
                 onClick = onTambahAktivitas, // Callback tombol diklik
                 shape = CircleShape, // Bentuk bulat sempurna sesuai gambar
-                containerColor = Color(0xFF22C55E), // Hijau cerah sesuai gambar
-                contentColor = Color.Black, // Warna ikon plus hitam sesuai gambar
+                containerColor = MaterialTheme.colorScheme.primary, // Hijau cerah sesuai gambar
+                contentColor = Color.White, // Warna ikon plus hitam sesuai gambar
+                modifier = Modifier
+                    .size(64.dp)
+                    .shadow(8.dp, CircleShape)
             ) {
                 // Ikon tambah "+" bawaan Material Icons
-                Icon(Icons.Default.Add, contentDescription = "Add Activity")
+                Icon(Icons.Default.Add, contentDescription = "Add Activity", modifier = Modifier.size(28.dp))
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding -> // Menampung padding Scaffold secara aman agar konten tidak tertutup
         Column(
             modifier = Modifier
                 .fillMaxSize() // Memenuhi layar
-                .background(Color(0xFFF8F9FF)) // Latar belakang abu-biru sangat muda
                 .padding(innerPadding) // Padding otomatis
         ) {
             // Menampilkan banner offline dengan animasi geser turun/naik jika status isOffline aktif
@@ -86,27 +106,16 @@ fun AktivitasScreen(
                 OfflineBanner()
             }
 
-            // LazyColumn bertindak layaknya RecyclerView (merender item yang tampak di layar saja secara efisien)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = 20.dp,
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
                     bottom = 100.dp, // Jarak padding bawah agar kartu terakhir tidak tertutupi
                 ),
-                verticalArrangement = Arrangement.spacedBy(16.dp), // Mengatur jarak antar item list 16.dp
+                verticalArrangement = Arrangement.spacedBy(12.dp), // Mengatur jarak antar item list
             ) {
-                // Item pertama adalah header judul utama "SIEPERKAP"
-                item {
-                    Text(
-                        text = "SIEPERKAP",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF006E2F), // Warna hijau utama
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
 
                 // Komponen kedua berupa kolom pencarian dan filter chip status
                 item {
@@ -207,12 +216,12 @@ private fun SearchFilterSection(
                 )
             },
             singleLine = true, // Mengunci input hanya satu baris saja
-            shape = RoundedCornerShape(28.dp), // Membuat ujung melingkar penuh (capsule) sesuai gambar
+            shape = RoundedCornerShape(12.dp), // Membuat ujung melingkar
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedContainerColor = Color(0xFFEFF4FF), // Latar belakang biru-abu sangat muda sesuai gambar
                 focusedContainerColor = Color(0xFFEFF4FF),
-                unfocusedBorderColor = Color.Transparent, // Border transparan saat tidak difokus
-                focusedBorderColor = Color(0xFF006E2F), // Border berwarna hijau saat aktif
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedBorderColor = MaterialTheme.colorScheme.primary, // Border berwarna hijau saat aktif
             ),
         )
 
@@ -293,15 +302,14 @@ fun AktivitasCard(
     aktivitas: Aktivitas,
     onClick: () -> Unit,
 ) {
-    // Menentukan warna aksen garis vertikal di pojok kiri berdasarkan status
-    val borderColor = when (aktivitas.status) {
-        StatusAktivitas.BERLANGSUNG -> Color(0xFF006E2F) // Hijau untuk berlangsung
-        StatusAktivitas.SELESAI     -> Color(0xFF6D7B6C) // Abu-abu untuk selesai
-        StatusAktivitas.DRAFT       -> Color(0xFF6D7B6C) // Abu-abu untuk draf
-    }
-
-    // Mengurangi kepekatan (opacity) card bernilai selesai menjadi 90% sebagai indikator pasif
     val isCompleted = aktivitas.status == StatusAktivitas.SELESAI
+    val isDraft = aktivitas.status == StatusAktivitas.DRAFT
+    
+    val statusLabel = when (aktivitas.status) {
+        StatusAktivitas.BERLANGSUNG -> "In Progress"
+        StatusAktivitas.SELESAI -> "Completed"
+        StatusAktivitas.DRAFT -> "Draft"
+    }
 
     Card(
         onClick = onClick,
@@ -310,78 +318,100 @@ fun AktivitasCard(
             .then(
                 if (isCompleted) Modifier.graphicsLayer(alpha = 0.9f) else Modifier
             ),
-        shape = RoundedCornerShape(24.dp), // Sudut membulat lebar sesuai gambar
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White, // Latar belakang putih bersih
+            containerColor = Color.White,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min) // Membuat tinggi Row mengikuti isi konten secara dinamis
-        ) {
-
-            // Garis pembatas aksen vertikal kiri berwarna (seperti border-l-4 di CSS)
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(borderColor)
-            )
-
-            // Area layout teks utama dalam kartu
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // Baris atas: Status badge di kiri, tanggal/label waktu di kanan
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    StatusBadge(status = aktivitas.status)
-                    Text(
-                        text = aktivitas.tanggal,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF6D7B6C), // Warna teks abu-abu sesuai gambar
-                    )
-                }
-
-                // Menampilkan nama judul aktivitas
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+         ) {
+             // Info Column
+             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = aktivitas.judul,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color(0xFF121C2A), // Biru gelap kehitaman
-                    fontWeight = FontWeight.Bold
-                )
-
-                // Menampilkan deskripsi singkat aktivitas
-                Text(
-                    text = aktivitas.deskripsi,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF3D4A3D),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Mengatur tampilan bagian bawah kartu secara adaptif bergantung status aktivitas
-                when (aktivitas.status) {
-                    StatusAktivitas.BERLANGSUNG -> {
-                        // Menampilkan section progress bar persentase
-                        ProgressSection(progress = aktivitas.progress)
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = if (aktivitas.status == StatusAktivitas.BERLANGSUNG) MaterialTheme.colorScheme.primaryContainer else Color(0xFFD9E3F6),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = statusLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (aktivitas.status == StatusAktivitas.BERLANGSUNG) MaterialTheme.colorScheme.primary else Color(0xFF3D4A3D)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = aktivitas.deskripsi,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Bottom sync-style banner
+                val bannerColor = if (aktivitas.isPending) {
+                    Color(0xFFFFF3CD)
+                } else {
+                    when (aktivitas.status) {
+                        StatusAktivitas.BERLANGSUNG -> Color(0xFFE8F5E9)
+                        StatusAktivitas.SELESAI -> Color(0xFFE8F5E9)
+                        StatusAktivitas.DRAFT -> Color(0xFFFFF3CD)
                     }
-                    StatusAktivitas.SELESAI -> {
-                        // Menampilkan badge hijau terverifikasi
-                        VerifiedBadge()
+                }
+                val bannerTextColor = if (aktivitas.isPending) {
+                    Color(0xFF856404)
+                } else {
+                    when (aktivitas.status) {
+                        StatusAktivitas.BERLANGSUNG -> Color(0xFF2E7D32)
+                        StatusAktivitas.SELESAI -> Color(0xFF2E7D32)
+                        StatusAktivitas.DRAFT -> Color(0xFF856404)
                     }
-                    StatusAktivitas.DRAFT -> {
-                        // Menampilkan draf badge
-                        DraftBadge()
+                }
+                val bannerText = if (aktivitas.isPending) {
+                    "Pending (Menunggu Sinkronisasi)"
+                } else {
+                    when (aktivitas.status) {
+                        StatusAktivitas.BERLANGSUNG -> "Aktivitas Berlangsung"
+                        StatusAktivitas.SELESAI -> "Aktivitas Selesai (Completed)"
+                        StatusAktivitas.DRAFT -> "Draf Aktivitas (Draft)"
                     }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            color = bannerColor,
+                            shape = RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = bannerText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = bannerTextColor
+                    )
                 }
             }
         }

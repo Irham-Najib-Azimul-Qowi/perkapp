@@ -14,10 +14,14 @@ sealed class Screen(val route: String) {
     }
     // Najib's routes
     object TambahAlat : Screen("tambah_alat")
+    object TambahAlatLuar : Screen("tambah_alat_luar")
     object DetailAlat : Screen("detail_alat/{alatId}") {
         fun createRoute(alatId: String) = "detail_alat/$alatId"
     }
     object EditAlat : Screen("edit_alat/{alatId}") {
         fun createRoute(alatId: String) = "edit_alat/$alatId"
+    }
+    object EditKegiatan : Screen("edit_kegiatan/{id}") {
+        fun createRoute(id: String) = "edit_kegiatan/$id"
     }
 }

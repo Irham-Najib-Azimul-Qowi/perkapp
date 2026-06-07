@@ -1,418 +1,706 @@
 package com.example.perkapp.core.features.kegiatan.ui
 
-// Mengimpor library dasar Jetpack Compose untuk menyusun UI
 import android.app.DatePickerDialog
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
+import com.example.perkapp.core.navigation.Screen
+import com.example.perkapp.features.alat.data.local.AlatEntity
+import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 import java.util.Calendar
+import androidx.hilt.navigation.compose.hiltViewModel
 
-/**
- * Composable screen untuk menambah kegiatan baru (Step 1: Info Kegiatan).
- *
- * @param navController Pengontrol navigasi untuk kembali ke halaman sebelumnya (Batal).
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TambahKegiatanScreen(navController: NavController) {
-    // Mendapatkan context Android untuk menampilkan DatePickerDialog
+fun TambahKegiatanScreen(
+    navController: NavController,
+    viewModel: AlatViewModel,
+    kegiatanViewModel: AktivitasViewModel = hiltViewModel()
+) {
     val context = LocalContext.current
+    var currentStep by rememberSaveable { mutableStateOf(1) }
 
-    // Mendapatkan objek Calendar saat ini
+    // State untuk Step 1
+    var namaAktivitas by rememberSaveable { mutableStateOf("") }
+    var tanggalPinjam by rememberSaveable { mutableStateOf("") }
+    var tanggalKembali by rememberSaveable { mutableStateOf("") }
+    var peminjam by rememberSaveable { mutableStateOf("") }
+    var lokasi by rememberSaveable { mutableStateOf("") }
+    var deskripsi by rememberSaveable { mutableStateOf("") }
+    var dropdownTerbuka by rememberSaveable { mutableStateOf(false) }
+
+    // State untuk Step 2 (Pilihan Alat)
+    val alatList by viewModel.alatList.observeAsState(emptyList())
+    var selectedQuantities by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var externalTools by remember { mutableStateOf(emptyList<String>()) }
+
+    // Listen to external tools added
+    val navBackStackEntry = navController.currentBackStackEntry
+    val newToolState = navBackStackEntry?.savedStateHandle?.getLiveData<String>("alat_luar_nama")?.observeAsState()
+    LaunchedEffect(newToolState?.value) {
+        newToolState?.value?.let { newTool ->
+            if (newTool.isNotBlank() && !externalTools.contains(newTool)) {
+                externalTools = externalTools + newTool
+                navBackStackEntry.savedStateHandle.remove<String>("alat_luar_nama")
+            }
+        }
+    }
+
+    // Trigger get tools on launch
+    LaunchedEffect(Unit) {
+        viewModel.getAllAlat()
+        kegiatanViewModel.fetchRegisteredUsers()
+    }
+
+    // Date picker setup
     val calendar = Calendar.getInstance()
     val tahunKini = calendar.get(Calendar.YEAR)
     val bulanKini = calendar.get(Calendar.MONTH)
     val hariKini = calendar.get(Calendar.DAY_OF_MONTH)
 
-    // State untuk menyimpan data input form
-    var namaAktivitas by remember { mutableStateOf("") }
-    var tanggalPinjam by remember { mutableStateOf("") }
-    var tanggalKembali by remember { mutableStateOf("") }
-    var peminjam by remember { mutableStateOf("") }
-    var deskripsi by remember { mutableStateOf("") }
-
-    // State untuk kontrol Dropdown Peminjam
-    var dropdownTerbuka by remember { mutableStateOf(false) }
-
-    // Daftar nama anggota/user untuk pilihan peminjam (dummy data)
-    val daftarAnggota = listOf("Reja", "Adam", "Najib", "Alex", "Budi", "Chandra", "Irham", "Najib Azimul")
-
-    // Filter daftar anggota secara real-time berdasarkan input teks dari user
-    val anggotaDifilter = daftarAnggota.filter {
-        it.contains(peminjam, ignoreCase = true)
-    }
-
-    // Penampung DatePickerDialog untuk Tanggal Pinjam
     val datePickerPinjam = DatePickerDialog(
         context,
         { _, tahun, bulan, hari ->
-            // Mengubah state tanggalPinjam dengan format dd/mm/yyyy
             tanggalPinjam = String.format("%02d/%02d/%04d", hari, bulan + 1, tahun)
         },
-        tahunKini,
-        bulanKini,
-        hariKini
+        tahunKini, bulanKini, hariKini
     )
 
-    // Penampung DatePickerDialog untuk Tanggal Kembali
     val datePickerKembali = DatePickerDialog(
         context,
         { _, tahun, bulan, hari ->
-            // Mengubah state tanggalKembali dengan format dd/mm/yyyy
             tanggalKembali = String.format("%02d/%02d/%04d", hari, bulan + 1, tahun)
         },
-        tahunKini,
-        bulanKini,
-        hariKini
+        tahunKini, bulanKini, hariKini
     )
 
-    // Layout utama berlatar belakang abu-biru sangat muda yang dapat di-scroll
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8F9FF))
-            .systemBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        
-        // ── TOP HEADER ────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Text(
-                text = "SIEPERKAP",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF006E2F)
-            )
-        }
+    val daftarAnggota by kegiatanViewModel.registeredUsers.collectAsState(initial = emptyList())
+    val anggotaDifilter = daftarAnggota.filter { it.contains(peminjam, ignoreCase = true) }
 
-        // ── STEP INDICATOR ───────────────────────────────────────────────────
-        // Menampilkan step 1 aktif (hijau) dan step 2 pasif (abu-abu)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            // Step 1: Info Kegiatan (Aktif)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF006E2F)), // Latar belakang hijau
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("1", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("info Kegiatan", fontSize = 11.sp, color = Color(0xFF006E2F), fontWeight = FontWeight.SemiBold)
-            }
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        cursorColor = MaterialTheme.colorScheme.primary
+    )
 
-            // Garis Penghubung antar Step
-            Box(
-                modifier = Modifier
-                    .width(100.dp)
-                    .height(1.dp)
-                    .background(Color(0xFFD9E3F6))
-                    .padding(horizontal = 8.dp)
-            )
-
-            // Step 2: Perlengkapan (Pasif)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFD9E3F6)), // Latar belakang abu-biru
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("2", color = Color(0xFF3D4A3D), fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Perlengkapan", fontSize = 11.sp, color = Color(0xFF6D7B6C))
-            }
-        }
-
-        // ── FORM INPUTS ──────────────────────────────────────────────────────
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            
-            // 1. INPUT: Nama Aktivitas
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Nama Aktivitas",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF121C2A)
-                )
-                OutlinedTextField(
-                    value = namaAktivitas,
-                    onValueChange = { namaAktivitas = it },
-                    placeholder = { Text("e.g. Field Research Seminar", color = Color.LightGray) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFFEFF4FF),
-                        focusedContainerColor = Color(0xFFEFF4FF),
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color(0xFF006E2F)
-                    )
-                )
-            }
-
-            // 2. INPUT: Tanggal Pinjam & Tanggal Kembali (Berdampingan)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Tanggal Pinjam
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
                     Text(
-                        text = "Tanggal Pinjam",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF121C2A)
+                        text = if (currentStep == 1) "Tambah Kegiatan (1/2)" else "Tambah Perlengkapan (2/2)",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                    OutlinedTextField(
-                        value = tanggalPinjam,
-                        onValueChange = {}, // Read-only, diisi via DatePicker
-                        placeholder = { Text("dd/mm/yyyy", color = Color.LightGray) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { datePickerPinjam.show() }, // Menampilkan dialog kalender saat ditap
-                        enabled = false, // Menonaktifkan input keyboard manual
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Pilih Tanggal Pinjam",
-                                tint = Color.Gray,
-                                modifier = Modifier.clickable { datePickerPinjam.show() }
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledContainerColor = Color(0xFFEFF4FF),
-                            disabledBorderColor = Color.Transparent,
-                            disabledTextColor = Color(0xFF121C2A)
-                        )
-                    )
-                }
-
-                // Tanggal Kembali
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Tanggal kembali",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF121C2A)
-                    )
-                    OutlinedTextField(
-                        value = tanggalKembali,
-                        onValueChange = {}, // Read-only, diisi via DatePicker
-                        placeholder = { Text("dd/mm/yyyy", color = Color.LightGray) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { datePickerKembali.show() }, // Menampilkan dialog kalender saat ditap
-                        enabled = false, // Menonaktifkan input keyboard manual
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.DateRange,
-                                contentDescription = "Pilih Tanggal Kembali",
-                                tint = Color.Gray,
-                                modifier = Modifier.clickable { datePickerKembali.show() }
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            disabledContainerColor = Color(0xFFEFF4FF),
-                            disabledBorderColor = Color.Transparent,
-                            disabledTextColor = Color(0xFF121C2A)
-                        )
-                    )
-                }
-            }
-
-            // 3. INPUT: Peminjam (Dengan Dropdown Pilihan Nama)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Peminjam",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF121C2A)
-                )
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = peminjam,
-                        onValueChange = {
-                            peminjam = it
-                            dropdownTerbuka = true // Otomatis buka dropdown saat mengetik
-                        },
-                        placeholder = { Text("Search members...", color = Color.LightGray) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { focusState ->
-                                // Buka dropdown jika kolom mendapatkan fokus ketikan
-                                if (focusState.isFocused) {
-                                    dropdownTerbuka = true
-                                }
-                            },
-                        trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Cari Peminjam",
-                                tint = Color.Gray
-                            )
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFFEFF4FF),
-                            focusedContainerColor = Color(0xFFEFF4FF),
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedBorderColor = Color(0xFF006E2F)
-                        )
-                    )
-
-                    // Dropdown menu berisi daftar nama yang bisa dipilih
-                    DropdownMenu(
-                        expanded = dropdownTerbuka && anggotaDifilter.isNotEmpty(),
-                        onDismissRequest = { dropdownTerbuka = false },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f) // Menyesuaikan lebar input
-                            .background(Color.White)
+                },
+                navigationIcon = {
+                    IconButton(
+                        onClick = {
+                            if (currentStep == 2) {
+                                currentStep = 1
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
                     ) {
-                        anggotaDifilter.forEach { nama ->
-                            DropdownMenuItem(
-                                text = { Text(nama, color = Color(0xFF121C2A)) },
-                                onClick = {
-                                    peminjam = nama // Menyalin nama terpilih ke teks input
-                                    dropdownTerbuka = false // Menutup dropdown
-                                }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Kembali",
+                            tint = Color.White
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = Color.White
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            // Step Indicator
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                // Step 1: Info Kegiatan
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (currentStep >= 1) MaterialTheme.colorScheme.primary else Color(0xFFD9E3F6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("1", color = if (currentStep >= 1) Color.White else Color(0xFF3D4A3D), fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Info Kegiatan", fontSize = 11.sp, color = if (currentStep >= 1) MaterialTheme.colorScheme.primary else Color(0xFF6D7B6C), fontWeight = FontWeight.SemiBold)
+                }
+
+                // Garis Penghubung
+                Box(
+                    modifier = Modifier
+                        .width(100.dp)
+                        .height(2.dp)
+                        .background(if (currentStep == 2) MaterialTheme.colorScheme.primary else Color(0xFFD9E3F6))
+                        .padding(horizontal = 8.dp)
+                )
+
+                // Step 2: Perlengkapan
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(if (currentStep == 2) MaterialTheme.colorScheme.primary else Color(0xFFD9E3F6)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("2", color = if (currentStep == 2) Color.White else Color(0xFF3D4A3D), fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Perlengkapan", fontSize = 11.sp, color = if (currentStep == 2) MaterialTheme.colorScheme.primary else Color(0xFF6D7B6C))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (currentStep == 1) {
+                // STEP 1 FORM
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 1. Nama Aktivitas
+                    OutlinedTextField(
+                        value = namaAktivitas,
+                        onValueChange = { namaAktivitas = it },
+                        label = { Text("Nama Aktivitas") },
+                        placeholder = { Text("e.g. Field Research Seminar") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        singleLine = true
+                    )
+
+                    // 2. Tanggal Pinjam & Tanggal Kembali (Berdampingan)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = tanggalPinjam,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tanggal Pinjam") },
+                            placeholder = { Text("dd/mm/yyyy") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { datePickerPinjam.show() },
+                            enabled = false,
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Pilih Tanggal Pinjam",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable { datePickerPinjam.show() }
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledContainerColor = Color.Transparent,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        )
+
+                        OutlinedTextField(
+                            value = tanggalKembali,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tanggal Kembali") },
+                            placeholder = { Text("dd/mm/yyyy") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { datePickerKembali.show() },
+                            enabled = false,
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Pilih Tanggal Kembali",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable { datePickerKembali.show() }
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                disabledContainerColor = Color.Transparent,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    }
+
+                    // 3. Peminjam (Dropdown)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = peminjam,
+                            onValueChange = {
+                                peminjam = it
+                                dropdownTerbuka = true
+                            },
+                            label = { Text("Peminjam") },
+                            placeholder = { Text("Search members...") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    if (focusState.isFocused) {
+                                        dropdownTerbuka = true
+                                    }
+                                },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Cari Peminjam",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = textFieldColors,
+                            singleLine = true
+                        )
+
+                        DropdownMenu(
+                            expanded = dropdownTerbuka && anggotaDifilter.isNotEmpty(),
+                            onDismissRequest = { dropdownTerbuka = false },
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            anggotaDifilter.forEach { nama ->
+                                DropdownMenuItem(
+                                    text = { Text(nama) },
+                                    onClick = {
+                                        peminjam = nama
+                                        dropdownTerbuka = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // 3.5 Lokasi
+                    OutlinedTextField(
+                        value = lokasi,
+                        onValueChange = { lokasi = it },
+                        label = { Text("Lokasi Kegiatan") },
+                        placeholder = { Text("e.g. Ruang Rapat Utama, Lab Kimia") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        singleLine = true
+                    )
+
+                    // 4. Deskripsi
+                    OutlinedTextField(
+                        value = deskripsi,
+                        onValueChange = { deskripsi = it },
+                        label = { Text("Deskripsi") },
+                        placeholder = { Text("Brief details about activity goals...") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = textFieldColors,
+                        maxLines = 5
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Actions for Step 1
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        onClick = {
+                            if (namaAktivitas.isNotBlank() && tanggalPinjam.isNotBlank() && peminjam.isNotBlank() && lokasi.isNotBlank()) {
+                                currentStep = 2
+                            } else {
+                                Toast.makeText(context, "Silakan lengkapi data wajib (Nama, Tanggal, Peminjam, Lokasi)!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text("Lanjut: Pilih Perlengkapan", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                        }
+                    }
+
+                    TextButton(onClick = { navController.popBackStack() }) {
+                        Text("Batal", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                // STEP 2 FORM (Pilihan Alat Inventaris)
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Header list & Button ke TambahAlatLuar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Pilih Alat dari Inventaris",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        // Button to TambahAlatLuarScreen
+                        OutlinedButton(
+                            onClick = {
+                                navController.navigate(Screen.TambahAlatLuar.route)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Pinjam Alat Luar",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (alatList.isEmpty() && externalTools.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Belum ada alat di inventaris.")
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (externalTools.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "Alat Luar yang Dipinjam",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                                items(externalTools) { compositeVal ->
+                                    val parts = compositeVal.split("|")
+                                    val name = parts.getOrNull(0) ?: ""
+                                    val imagePath = parts.getOrNull(1)?.takeIf { it.isNotBlank() }
+                                    val bitmap = com.example.perkapp.core.utils.rememberAsyncImage(imagePath)
+
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                bitmap?.let {
+                                                    androidx.compose.foundation.Image(
+                                                        bitmap = it.asImageBitmap(),
+                                                        contentDescription = "Gambar Alat Luar",
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                                        modifier = Modifier
+                                                            .size(48.dp)
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                    )
+                                                } ?: Text(
+                                                    text = name.take(1).uppercase(),
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Text(
+                                                text = name,
+                                                modifier = Modifier.weight(1f),
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text("1 unit (Pinjaman)", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(MaterialTheme.colorScheme.outlineVariant)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            }
+
+                            items(alatList) { alat ->
+                                ToolSelectionCard(
+                                    alat = alat,
+                                    qtySelected = selectedQuantities[alat.id] ?: 0,
+                                    onQtyChange = { newQty ->
+                                        selectedQuantities = selectedQuantities.toMutableMap().apply {
+                                            put(alat.id, newQty)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Actions for Step 2
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Button(
+                            onClick = {
+                                val selectedToolsList = selectedQuantities.entries
+                                    .filter { it.value > 0 }
+                                    .map { Pair(it.key, it.value) }
+
+                                kegiatanViewModel.insertKegiatan(
+                                    judul = namaAktivitas,
+                                    kategori = "Umum",
+                                    lokasi = lokasi,
+                                    tanggal = tanggalPinjam,
+                                    status = "BERLANGSUNG",
+                                    tools = selectedToolsList,
+                                    externalTools = externalTools.toList(),
+                                    onSuccess = {
+                                        Toast.makeText(context, "Kegiatan berhasil disimpan!", Toast.LENGTH_SHORT).show()
+                                        navController.popBackStack()
+                                    }
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Simpan Kegiatan", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
+
+                        TextButton(onClick = { currentStep = 1 }) {
+                            Text("Kembali ke Info Kegiatan", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
-
-            // 4. INPUT: Deskripsi (Multi-line)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Deskripsi",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF121C2A)
-                )
-                OutlinedTextField(
-                    value = deskripsi,
-                    onValueChange = { deskripsi = it },
-                    placeholder = { 
-                        Text(
-                            "Brief details about the activity goals and requirements...", 
-                            color = Color.LightGray,
-                            fontSize = 14.sp
-                        ) 
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(130.dp), // Tinggi lebih besar khusus deskripsi
-                    shape = RoundedCornerShape(12.dp),
-                    maxLines = 5,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color(0xFFEFF4FF),
-                        focusedContainerColor = Color(0xFFEFF4FF),
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = Color(0xFF006E2F)
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ── ACTION BUTTONS ────────────────────────────────────────────────────
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Tombol Hijau Utama: Lanjut ke penambahan perlengkapan
-            Button(
-                onClick = {
-                    // Logic lanjut ke langkah berikutnya (sementara memicu navigasi balik ke list)
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(28.dp), // Bentuk melingkar ujung
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)) // Warna hijau terang
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text("Lanjut:Tambah Perlengkapan", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.White)
-                }
-            }
-
-            // Tombol Teks: Batal
-            Text(
-                text = "Batal",
-                color = Color(0xFF006E2F), // Hijau utama
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .clickable {
-                        // Kembali ke halaman sebelumnya
-                        navController.popBackStack()
-                    }
-                    .padding(8.dp)
-            )
         }
     }
 }
 
-// Preview untuk mendemonstrasikan rancangan antarmuka TambahKegiatanScreen di IDE Android Studio
-@Preview(showBackground = true)
 @Composable
-fun TambahKegiatanScreenPreview() {
-    TambahKegiatanScreen(navController = rememberNavController())
+fun ToolSelectionCard(
+    alat: AlatEntity,
+    qtySelected: Int,
+    onQtyChange: (Int) -> Unit
+) {
+    val bitmap = com.example.perkapp.core.utils.rememberAsyncImage(alat.image_path)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                bitmap?.let {
+                    androidx.compose.foundation.Image(
+                        bitmap = it.asImageBitmap(),
+                        contentDescription = "Gambar Alat",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                } ?: Text(
+                    text = alat.name.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = alat.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Tersedia: ${alat.available_qty} unit",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = { if (qtySelected > 0) onQtyChange(qtySelected - 1) },
+                    enabled = qtySelected > 0,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = if (qtySelected > 0) MaterialTheme.colorScheme.primaryContainer else Color(0xFFD9E3F6),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Remove,
+                        contentDescription = "Kurang",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (qtySelected > 0) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+
+                Text(
+                    text = "$qtySelected",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.width(20.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+
+                IconButton(
+                    onClick = { if (qtySelected < alat.available_qty) onQtyChange(qtySelected + 1) },
+                    enabled = qtySelected < alat.available_qty,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(
+                            color = if (qtySelected < alat.available_qty) MaterialTheme.colorScheme.primaryContainer else Color(0xFFD9E3F6),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah",
+                        modifier = Modifier.size(16.dp),
+                        tint = if (qtySelected < alat.available_qty) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+            }
+        }
+    }
 }

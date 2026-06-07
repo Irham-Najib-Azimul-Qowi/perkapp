@@ -12,6 +12,14 @@ import dagger.hilt.android.HiltAndroidApp
  */
 @HiltAndroidApp
 class PerkappApplication : Application() {
-    // Di sini kita tidak perlu menulis logika tambahan
-    // Hilt akan otomatis menangani inisialisasi graf dependensi di latar belakang
+    
+    companion object {
+        lateinit var instance: PerkappApplication
+            private set
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
 }

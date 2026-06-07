@@ -26,7 +26,8 @@ data class Kegiatan(
     val lokasi: String,              // Lokasi kegiatan, contoh: "Zone B - Sector 4"
     val labelWaktu: String,          // Label waktu: "2h left", "Active", "Started"
     val progress: Float,             // Progress 0.0f - 1.0f (0% - 100%)
-    val statusType: StatusKegiatan   // Tipe status untuk warna kartu
+    val statusType: StatusKegiatan,  // Tipe status untuk warna kartu
+    val isPending: Boolean = false   // Status sync
 )
 
 

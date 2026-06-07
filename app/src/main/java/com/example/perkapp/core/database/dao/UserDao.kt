@@ -15,7 +15,7 @@ interface UserDao {
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
 
-    @Query("SELECT * FROM users WHERE email = :email AND password = :password LIMIT 1")
+    @Query("SELECT * FROM users WHERE (email = :email OR name = :email) AND password = :password LIMIT 1")
     suspend fun loginUser(email: String, password: String): UserEntity?
 
     @Query("DELETE FROM users")
