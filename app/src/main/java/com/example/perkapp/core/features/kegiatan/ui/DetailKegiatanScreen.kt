@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,6 +87,12 @@ fun DetailKegiatanScreen(
         val isCreator = aktivitas?.createdBy != null && aktivitas.createdBy == currentUserId
         isAdmin || isCreator || peminjamList.any { it.equals(currentUserName, ignoreCase = true) }
     }
+    
+    // Approval logic: admin can approve alat for member-created kegiatan
+    val needsApproval = remember(aktivitas, isAdmin) {
+        aktivitas != null && isAdmin && aktivitas.alatApproved == false && !aktivitas.isPending
+    }
+    val isApproved = aktivitas?.alatApproved ?: false
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -218,6 +225,60 @@ fun DetailKegiatanScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        
+                        // Approval Status Banner
+                        Spacer(modifier = Modifier.height(16.dp))
+                        if (!isApproved) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = Color(0xFFFFF3CD),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFF856404)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Alat menunggu persetujuan admin",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF856404)
+                                )
+                            }
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = Color(0xFFE8F5E9),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFF2E7D32)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Alat telah disetujui ✓",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -285,6 +346,39 @@ fun DetailKegiatanScreen(
 
                 // Action buttons only visible if user has access (Creator/Borrower/Admin)
                 if (hasAccess) {
+                    // Approve button for admin (only shown for unapproved member-created kegiatan)
+                    if (needsApproval) {
+                        Button(
+                            onClick = {
+                                viewModel.approveAlat(kegiatanId) {
+                                    Toast.makeText(context, "Alat berhasil disetujui!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2E7D32)
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.ThumbUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Setujui Alat",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
                     // Edit Button
                     Button(
                         onClick = { onEditClick(data.id) },

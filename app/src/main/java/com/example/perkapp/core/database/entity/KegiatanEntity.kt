@@ -16,5 +16,6 @@ data class KegiatanEntity(
     val deskripsi: String = "",
     val sync_status: String = "synced",
     val pending_action: String? = null,
-    val created_by: String? = null
+    val created_by: String? = null,
+    val alat_approved: Boolean = false
 )

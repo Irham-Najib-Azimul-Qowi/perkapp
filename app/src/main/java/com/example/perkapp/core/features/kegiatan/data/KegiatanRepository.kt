@@ -79,6 +79,7 @@ interface KegiatanRepository {
         peminjam: String,
         deskripsi: String
     )
+    suspend fun approveAlatForKegiatan(kegiatanId: String)
 }
 
 class KegiatanRepositoryImpl(
@@ -157,7 +158,20 @@ class KegiatanRepositoryImpl(
                     val db = AppDatabase.getDatabase(context)
                     val alatDao = db.alatDao()
                     
+                    // Collect all server kegiatan IDs to detect deletions
+                    val serverKegiatanIds = mutableSetOf<String>()
+                    
                     for (kegDto in response.data) {
+                        // Skip kegiatan with "deleted" status from server
+                        if (kegDto.status?.lowercase() == "deleted") {
+                            // Remove from local DB if exists
+                            dao.deleteKegiatanAlatForKegiatan(kegDto.id)
+                            dao.deleteKegiatan(kegDto.id)
+                            continue
+                        }
+                        
+                        serverKegiatanIds.add(kegDto.id)
+                        
                         val localCopy = dao.getKegiatanById(kegDto.id)
                         if (localCopy == null || localCopy.sync_status != "pending") {
                             val parsed = parseDescription(kegDto.description)
@@ -172,7 +186,8 @@ class KegiatanRepositoryImpl(
                                 deskripsi = parsed.deskripsi,
                                 sync_status = "synced",
                                 pending_action = null,
-                                created_by = kegDto.created_by
+                                created_by = kegDto.created_by,
+                                alat_approved = localCopy?.alat_approved ?: false
                             )
                             dao.insertKegiatan(kegiatanEntity)
                             
@@ -196,6 +211,16 @@ class KegiatanRepositoryImpl(
                                 )
                                 dao.insertKegiatanAlat(kaEntity)
                             }
+                        }
+                    }
+                    
+                    // Remove local kegiatan that no longer exist on server (deleted by other users)
+                    // Only remove synced ones, not locally pending ones
+                    val allLocalKegiatan = dao.getAllKegiatan()
+                    for (localKeg in allLocalKegiatan) {
+                        if (localKeg.sync_status == "synced" && localKeg.id !in serverKegiatanIds) {
+                            dao.deleteKegiatanAlatForKegiatan(localKeg.id)
+                            dao.deleteKegiatan(localKeg.id)
                         }
                     }
                 }
@@ -244,6 +269,29 @@ class KegiatanRepositoryImpl(
         )
     }
 
+    override suspend fun approveAlatForKegiatan(kegiatanId: String) {
+        dao.approveAlatForKegiatan(kegiatanId)
+        
+        // Also sync the approval to server by updating the kegiatan
+        val existing = dao.getKegiatanById(kegiatanId)
+        if (existing != null && NetworkUtils.isOnline(context)) {
+            try {
+                val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nDeskripsi: ${existing.deskripsi}"
+                apiService.updateKegiatan(
+                    id = kegiatanId,
+                    request = UpdateKegiatanRequest(
+                        name = existing.judul,
+                        description = desc,
+                        date = formatToLaravelDate(existing.tanggal),
+                        status = mapToLaravelStatus(existing.status)
+                    )
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     private fun getSapaanBerdasarkanJam(): String {
         val jam = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return when {
@@ -287,6 +335,34 @@ class KegiatanRepositoryImpl(
         externalTools: List<String>
     ): String {
         val kegiatanId = UUID.randomUUID().toString()
+        val db = AppDatabase.getDatabase(context)
+        val currentUser = db.userDao().getUser().firstOrNull()
+        val currentUserRole = currentUser?.role ?: "member"
+        val currentUserId = currentUser?.id
+        
+        // Auto-add all admin users as peminjam
+        var finalPeminjam = peminjam
+        try {
+            val registeredUserDao = db.registeredUserDao()
+            val allUsers = registeredUserDao.getAllRegisteredUsers()
+            val adminNames = allUsers
+                .filter { it.role.lowercase() == "admin" }
+                .map { it.name }
+            
+            val currentPeminjamList = finalPeminjam.split(",").map { it.trim() }.filter { it.isNotBlank() }.toMutableList()
+            for (adminName in adminNames) {
+                if (currentPeminjamList.none { it.equals(adminName, ignoreCase = true) }) {
+                    currentPeminjamList.add(adminName)
+                }
+            }
+            finalPeminjam = currentPeminjamList.joinToString(", ")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        // If creator is admin, alat is auto-approved
+        val isCreatorAdmin = currentUserRole.lowercase() == "admin"
+        
         val kegiatan = KegiatanEntity(
             id = kegiatanId,
             judul = judul,
@@ -294,16 +370,16 @@ class KegiatanRepositoryImpl(
             lokasi = lokasi,
             tanggal = tanggal,
             status = status,
-            peminjam = peminjam,
+            peminjam = finalPeminjam,
             deskripsi = deskripsi,
             sync_status = "pending",
             pending_action = "create",
-            created_by = AppDatabase.getDatabase(context).userDao().getUser().firstOrNull()?.id
+            created_by = currentUserId,
+            alat_approved = isCreatorAdmin
         )
         dao.insertKegiatan(kegiatan)
 
         // Insert internal tools
-        val db = AppDatabase.getDatabase(context)
         val alatDao = db.alatDao()
         for ((toolId, qty) in tools) {
             val toolEntity = alatDao.getAlatById(toolId)
@@ -358,7 +434,7 @@ class KegiatanRepositoryImpl(
         // Try direct sync if online
         if (NetworkUtils.isOnline(context)) {
             try {
-                val desc = "Peminjam: $peminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
+                val desc = "Peminjam: $finalPeminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
                 val response = apiService.createKegiatan(
                     CreateKegiatanRequest(
                         id = kegiatanId,
@@ -727,4 +803,6 @@ class FakeKegiatanRepository(private val context: Context) : KegiatanRepository 
         peminjam: String,
         deskripsi: String
     ) = impl.updateKegiatanLocal(id, judul, kategori, lokasi, tanggal, status, peminjam, deskripsi)
+
+    override suspend fun approveAlatForKegiatan(kegiatanId: String) = impl.approveAlatForKegiatan(kegiatanId)
 }

@@ -44,7 +44,8 @@ data class Aktivitas(
     val isPending: Boolean = false, // Status sync
     val peminjam: String = "",
     val realDeskripsi: String = "",
-    val createdBy: String? = null
+    val createdBy: String? = null,
+    val alatApproved: Boolean = false // Status persetujuan alat oleh admin
 )
 
 /**

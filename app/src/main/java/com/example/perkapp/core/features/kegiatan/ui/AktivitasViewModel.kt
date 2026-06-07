@@ -145,7 +145,8 @@ class AktivitasViewModel @Inject constructor(
                             isPending = entity.sync_status == "pending",
                             peminjam = entity.peminjam,
                             realDeskripsi = entity.deskripsi,
-                            createdBy = entity.created_by
+                            createdBy = entity.created_by,
+                            alatApproved = entity.alat_approved
                         )
                     }
                 _allAktivitas.value = mapped
@@ -253,6 +254,19 @@ class AktivitasViewModel @Inject constructor(
             try {
                 repository.deleteKegiatan(kegiatanId)
                 loadActivities()
+                onSuccess()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun approveAlat(kegiatanId: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                repository.approveAlatForKegiatan(kegiatanId)
+                loadActivities()
+                loadAlatForKegiatan(kegiatanId)
                 onSuccess()
             } catch (e: Exception) {
                 e.printStackTrace()

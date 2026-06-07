@@ -41,4 +41,7 @@ interface KegiatanDao {
 
     @Query("SELECT * FROM kegiatan_alat WHERE alatId = :alatId AND isReturned = 0")
     suspend fun getActiveBorrowingsForAlat(alatId: String): List<KegiatanAlatEntity>
+
+    @Query("UPDATE kegiatan SET alat_approved = 1 WHERE id = :kegiatanId")
+    suspend fun approveAlatForKegiatan(kegiatanId: String)
 }
