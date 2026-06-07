@@ -43,6 +43,7 @@ enum class StatusKegiatan {
 // Data class informasi user yang sedang login
 // Diambil dari UserPreferences milik Adam
 data class UserInfo(
+    val id: String = "",    // ID unik user
     val nama: String,       // Nama user, contoh: "Alex"
     val sapaan: String,     // Berdasarkan jam: "Good Morning", "Good Afternoon"
     val fotoUrl: String,    // URL foto profil user

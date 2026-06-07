@@ -20,7 +20,7 @@ import com.example.perkapp.features.media.data.ImageEntity
 
 @Database(
     entities = [UserEntity::class, AlatEntity::class, ImageEntity::class, KegiatanEntity::class, KegiatanAlatEntity::class, RegisteredUserEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,6 +50,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE kegiatan ADD COLUMN created_by TEXT DEFAULT NULL")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -57,7 +67,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "perkapp_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_7_8)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

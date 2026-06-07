@@ -144,7 +144,8 @@ class AktivitasViewModel @Inject constructor(
                             tanggal = entity.tanggal,
                             isPending = entity.sync_status == "pending",
                             peminjam = entity.peminjam,
-                            realDeskripsi = entity.deskripsi
+                            realDeskripsi = entity.deskripsi,
+                            createdBy = entity.created_by
                         )
                     }
                 _allAktivitas.value = mapped

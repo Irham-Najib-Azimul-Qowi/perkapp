@@ -13,6 +13,7 @@ import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 import com.example.perkapp.features.kegiatan.domain.UserInfo
 import java.util.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 
 data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String)
 
@@ -170,7 +171,8 @@ class KegiatanRepositoryImpl(
                                 peminjam = parsed.peminjam,
                                 deskripsi = parsed.deskripsi,
                                 sync_status = "synced",
-                                pending_action = null
+                                pending_action = null,
+                                created_by = kegDto.created_by
                             )
                             dao.insertKegiatan(kegiatanEntity)
                             
@@ -232,7 +234,9 @@ class KegiatanRepositoryImpl(
         val userEntity = userDao.getUser().first()
         val name = userEntity?.name ?: "User Perkapp"
         val role = userEntity?.role ?: "member"
+        val id = userEntity?.id ?: ""
         return UserInfo(
+            id = id,
             nama = name,
             sapaan = getSapaanBerdasarkanJam(),
             fotoUrl = "",
@@ -293,7 +297,8 @@ class KegiatanRepositoryImpl(
             peminjam = peminjam,
             deskripsi = deskripsi,
             sync_status = "pending",
-            pending_action = "create"
+            pending_action = "create",
+            created_by = AppDatabase.getDatabase(context).userDao().getUser().firstOrNull()?.id
         )
         dao.insertKegiatan(kegiatan)
 

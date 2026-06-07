@@ -107,6 +107,7 @@ fun TambahKegiatanScreen(
     )
 
     val daftarAnggota by kegiatanViewModel.registeredUsers.collectAsState(initial = emptyList())
+    val currentUserInfo by kegiatanViewModel.currentUserInfo.collectAsState()
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -350,7 +351,7 @@ fun TambahKegiatanScreen(
                             )
 
                             val anggotaDifilter = daftarAnggota.filter { 
-                                it.contains(peminjamInput, ignoreCase = true) && !daftarPeminjam.contains(it) 
+                                it.contains(peminjamInput, ignoreCase = true) && !daftarPeminjam.contains(it) && it != currentUserInfo?.nama
                             }
 
                             DropdownMenu(

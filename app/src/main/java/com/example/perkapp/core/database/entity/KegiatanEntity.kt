@@ -15,5 +15,6 @@ data class KegiatanEntity(
     val peminjam: String = "",
     val deskripsi: String = "",
     val sync_status: String = "synced",
-    val pending_action: String? = null
+    val pending_action: String? = null,
+    val created_by: String? = null
 )

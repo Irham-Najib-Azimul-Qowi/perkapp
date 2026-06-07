@@ -43,7 +43,8 @@ data class Aktivitas(
     val tanggal: String, // Informasi tanggal atau status langsung
     val isPending: Boolean = false, // Status sync
     val peminjam: String = "",
-    val realDeskripsi: String = ""
+    val realDeskripsi: String = "",
+    val createdBy: String? = null
 )
 
 /**

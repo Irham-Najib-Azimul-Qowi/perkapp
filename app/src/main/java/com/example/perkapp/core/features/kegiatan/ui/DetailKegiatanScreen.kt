@@ -78,11 +78,13 @@ fun DetailKegiatanScreen(
     val currentUserName = currentUserInfo?.nama ?: ""
     val currentUserRole = currentUserInfo?.role ?: "member"
     val isAdmin = currentUserRole.lowercase() == "admin"
+    val currentUserId = currentUserInfo?.id ?: ""
     val peminjamList = remember(aktivitas?.peminjam) {
         aktivitas?.peminjam?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
     }
-    val hasAccess = remember(isAdmin, peminjamList, currentUserName) {
-        isAdmin || peminjamList.any { it.equals(currentUserName, ignoreCase = true) }
+    val hasAccess = remember(isAdmin, peminjamList, currentUserName, aktivitas, currentUserId) {
+        val isCreator = aktivitas?.createdBy != null && aktivitas.createdBy == currentUserId
+        isAdmin || isCreator || peminjamList.any { it.equals(currentUserName, ignoreCase = true) }
     }
 
     if (showDeleteDialog) {
@@ -221,49 +223,62 @@ fun DetailKegiatanScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Section header for tools
-                Text(
-                    text = "Daftar & Absensi Pengembalian Alat",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
-                )
+                if (hasAccess) {
+                    // Section header for tools
+                    Text(
+                        text = "Daftar & Absensi Pengembalian Alat",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)
+                    )
 
-                // List of tool cards matching AlatCard style
-                toolList.forEach { toolEntity ->
-                    val tool = DetailToolState(
-                        id = toolEntity.id,
-                        name = toolEntity.name,
-                        category = toolEntity.category,
-                        qty = toolEntity.qty,
-                        isExternal = toolEntity.isExternal,
-                        isReturned = toolEntity.isReturned,
-                        isPending = toolEntity.sync_status == "pending",
-                        imagePath = toolEntity.image_path
-                    )
-                    DetailKegiatanToolCard(
-                        tool = tool,
-                        onClick = {
-                            if (!hasAccess) {
-                                Toast.makeText(context, "Hanya user/peminjam terdaftar yang dapat mengabsen alat!", Toast.LENGTH_LONG).show()
-                                return@DetailKegiatanToolCard
-                            }
-                            val nextState = !toolEntity.isReturned
-                            viewModel.updateKegiatanAlatStatus(toolEntity.id, nextState, kegiatanId)
-                            
-                            val toastMsg = if (nextState) {
-                                if (toolEntity.isExternal) {
-                                    "Alat Luar '${toolEntity.name}' berhasil diabsen kembali ke pemilik luar!"
+                    // List of tool cards matching AlatCard style
+                    toolList.forEach { toolEntity ->
+                        val tool = DetailToolState(
+                            id = toolEntity.id,
+                            name = toolEntity.name,
+                            category = toolEntity.category,
+                            qty = toolEntity.qty,
+                            isExternal = toolEntity.isExternal,
+                            isReturned = toolEntity.isReturned,
+                            isPending = toolEntity.sync_status == "pending",
+                            imagePath = toolEntity.image_path
+                        )
+                        DetailKegiatanToolCard(
+                            tool = tool,
+                            onClick = {
+                                val nextState = !toolEntity.isReturned
+                                viewModel.updateKegiatanAlatStatus(toolEntity.id, nextState, kegiatanId)
+                                
+                                val toastMsg = if (nextState) {
+                                    if (toolEntity.isExternal) {
+                                        "Alat Luar '${toolEntity.name}' berhasil diabsen kembali ke pemilik luar!"
+                                    } else {
+                                        "Alat '${toolEntity.name}' berhasil diabsen kembali ke inventaris!"
+                                    }
                                 } else {
-                                    "Alat '${toolEntity.name}' berhasil diabsen kembali ke inventaris!"
+                                    "Absensi pengembalian '${toolEntity.name}' dibatalkan."
                                 }
-                            } else {
-                                "Absensi pengembalian '${toolEntity.name}' dibatalkan."
+                                Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                             }
-                            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                        )
+                    }
+                } else {
+                    // Text info that tools are hidden
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Anda tidak memiliki akses ke daftar alat untuk kegiatan ini. Hanya pembuat atau peminjam terdaftar yang bisa melihat dan mengelola alat.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
