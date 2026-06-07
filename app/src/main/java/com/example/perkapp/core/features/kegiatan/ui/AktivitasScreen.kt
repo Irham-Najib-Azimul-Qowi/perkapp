@@ -229,11 +229,19 @@ private fun SearchFilterSection(
             ),
         )
 
-        // Baris gulir horizontal berisi tombol filter chip (hanya In Progress & Completed)
+        // Baris gulir horizontal berisi tombol filter chip
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()), // Aktif scroll ke samping
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // Chip status: All
+            FilterChipItem(
+                label = "All",
+                selected = activeFilter == null,
+                onClick = {
+                    onFilterChange(null)
+                },
+            )
             // Chip status: In Progress
             FilterChipItem(
                 label = "In Progress",

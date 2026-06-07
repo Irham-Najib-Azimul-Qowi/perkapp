@@ -15,7 +15,7 @@ import java.util.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 
-data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String, val isApproved: Boolean = false)
+data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String, val isApproved: Boolean = false, val returnedTools: List<String> = emptyList())
 
 fun parseDescription(fullDesc: String?): ParsedDescription {
     if (fullDesc == null) return ParsedDescription("", "", "", "")
@@ -24,6 +24,7 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
     var kategori = ""
     var deskripsi = ""
     var isApproved = false
+    val returnedTools = mutableListOf<String>()
     
     val lines = fullDesc.split("\n")
     for (line in lines) {
@@ -38,6 +39,12 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
                     isApproved = true
                 }
             }
+            trimmed.startsWith("ReturnedTools: ") -> {
+                val toolsStr = trimmed.removePrefix("ReturnedTools: ")
+                if (toolsStr.isNotBlank()) {
+                    returnedTools.addAll(toolsStr.split(",").map { it.trim() })
+                }
+            }
             trimmed.startsWith("Deskripsi: ") -> deskripsi = trimmed.removePrefix("Deskripsi: ")
             else -> {
                 if (trimmed.isNotBlank()) {
@@ -50,7 +57,7 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
             }
         }
     }
-    return ParsedDescription(peminjam, lokasi, kategori, deskripsi, isApproved)
+    return ParsedDescription(peminjam, lokasi, kategori, deskripsi, isApproved, returnedTools)
 }
 
 interface KegiatanRepository {
@@ -211,7 +218,7 @@ class KegiatanRepositoryImpl(
                                     category = alatDto.category,
                                     qty = alatDto.pivot?.qty ?: 1,
                                     isExternal = false,
-                                    isReturned = kegDto.status == "completed",
+                                    isReturned = kegDto.status == "completed" || parsed.returnedTools.contains("${kegDto.id}_${alatDto.id}"),
                                     image_path = toolImagePath,
                                     sync_status = "synced",
                                     pending_action = null
@@ -283,8 +290,12 @@ class KegiatanRepositoryImpl(
         val existing = dao.getKegiatanById(kegiatanId)
         if (existing != null && NetworkUtils.isOnline(context)) {
             try {
+                val allTools = dao.getAlatForKegiatan(kegiatanId)
+                val returnedIds = allTools.filter { it.isReturned }.map { it.id }
+                val returnedStr = if (returnedIds.isNotEmpty()) "\nReturnedTools: ${returnedIds.joinToString(",")}" else ""
+                
                 // Include StatusAlat: Approved in the description sent to server
-                val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nStatusAlat: Approved\nDeskripsi: ${existing.deskripsi}"
+                val desc = "Peminjam: ${existing.peminjam}\nLokasi: ${existing.lokasi}\nKategori: ${existing.kategori}\nStatusAlat: Approved${returnedStr}\nDeskripsi: ${existing.deskripsi}"
                 
                 apiService.updateKegiatan(
                     id = kegiatanId,
@@ -542,8 +553,24 @@ class KegiatanRepositoryImpl(
 
             if (NetworkUtils.isOnline(context)) {
                 try {
-                    // If returning a tool on server, it usually is handled by completing the activity,
-                    // but we mark synced locally to ensure consistency.
+                    val kegiatan = dao.getKegiatanById(tool.kegiatanId)
+                    if (kegiatan != null) {
+                        val allTools = dao.getAlatForKegiatan(tool.kegiatanId)
+                        val returnedIds = allTools.filter { it.isReturned }.map { it.id }
+                        val returnedStr = if (returnedIds.isNotEmpty()) "\nReturnedTools: ${returnedIds.joinToString(",")}" else ""
+                        val approvalTag = if (kegiatan.alat_approved) "\nStatusAlat: Approved" else ""
+                        val desc = "Peminjam: ${kegiatan.peminjam}\nLokasi: ${kegiatan.lokasi}\nKategori: ${kegiatan.kategori}${approvalTag}${returnedStr}\nDeskripsi: ${kegiatan.deskripsi}"
+                        
+                        apiService.updateKegiatan(
+                            id = kegiatan.id,
+                            request = UpdateKegiatanRequest(
+                                name = kegiatan.judul,
+                                description = desc,
+                                date = formatToLaravelDate(kegiatan.tanggal),
+                                status = mapToLaravelStatus(kegiatan.status)
+                            )
+                        )
+                    }
                     dao.updateKegiatanAlat(updated.copy(sync_status = "synced", pending_action = null))
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -558,39 +585,43 @@ class KegiatanRepositoryImpl(
         try {
             val pendingKegiatan = dao.getPendingKegiatan()
             for (keg in pendingKegiatan) {
-                if (keg.pending_action == "create") {
+                if (keg.pending_action == "create" || keg.pending_action == "update") {
+                    val allTools = dao.getAlatForKegiatan(keg.id)
+                    val returnedIds = allTools.filter { it.isReturned }.map { it.id }
+                    val returnedStr = if (returnedIds.isNotEmpty()) "\nReturnedTools: ${returnedIds.joinToString(",")}" else ""
                     val approvalTag = if (keg.alat_approved) "\nStatusAlat: Approved" else ""
-                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}${approvalTag}\nDeskripsi: ${keg.deskripsi}"
-                    val response = apiService.createKegiatan(
-                        CreateKegiatanRequest(
+                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}${approvalTag}${returnedStr}\nDeskripsi: ${keg.deskripsi}"
+                    
+                    if (keg.pending_action == "create") {
+                        val response = apiService.createKegiatan(
+                            CreateKegiatanRequest(
+                                id = keg.id,
+                                name = keg.judul,
+                                description = desc,
+                                date = formatToLaravelDate(keg.tanggal),
+                                status = mapToLaravelStatus(keg.status)
+                            )
+                        )
+                        if (response.success) {
+                            dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
+                        } else {
+                            success = false
+                        }
+                    } else {
+                        val response = apiService.updateKegiatan(
                             id = keg.id,
-                            name = keg.judul,
-                            description = desc,
-                            date = formatToLaravelDate(keg.tanggal),
-                            status = mapToLaravelStatus(keg.status)
+                            request = UpdateKegiatanRequest(
+                                name = keg.judul,
+                                description = desc,
+                                date = formatToLaravelDate(keg.tanggal),
+                                status = mapToLaravelStatus(keg.status)
+                            )
                         )
-                    )
-                    if (response.success) {
-                        dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
-                    } else {
-                        success = false
-                    }
-                } else if (keg.pending_action == "update") {
-                    val approvalTag = if (keg.alat_approved) "\nStatusAlat: Approved" else ""
-                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}${approvalTag}\nDeskripsi: ${keg.deskripsi}"
-                    val response = apiService.updateKegiatan(
-                        id = keg.id,
-                        request = UpdateKegiatanRequest(
-                            name = keg.judul,
-                            description = desc,
-                            date = formatToLaravelDate(keg.tanggal),
-                            status = mapToLaravelStatus(keg.status)
-                        )
-                    )
-                    if (response.success) {
-                        dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
-                    } else {
-                        success = false
+                        if (response.success) {
+                            dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
+                        } else {
+                            success = false
+                        }
                     }
                 } else if (keg.pending_action == "delete") {
                     try {
@@ -644,22 +675,55 @@ class KegiatanRepositoryImpl(
 
             for (pa in pendingAlats) {
                 if (!pa.isExternal) {
-                    try {
-                        val response = apiService.addToolToKegiatan(
-                            AddToolToKegiatanRequest(
-                                kegiatan_id = pa.kegiatanId,
-                                alat_id = pa.alatId,
-                                qty = pa.qty
+                    if (pa.pending_action == "create") {
+                        try {
+                            val response = apiService.addToolToKegiatan(
+                                AddToolToKegiatanRequest(
+                                    kegiatan_id = pa.kegiatanId,
+                                    alat_id = pa.alatId,
+                                    qty = pa.qty
+                                )
                             )
-                        )
-                        if (response.success) {
-                            dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
-                        } else {
+                            if (response.success) {
+                                dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                            } else {
+                                success = false
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                             success = false
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        success = false
+                    } else if (pa.pending_action == "update") {
+                        try {
+                            val kegiatan = dao.getKegiatanById(pa.kegiatanId)
+                            if (kegiatan != null) {
+                                val allTools = dao.getAlatForKegiatan(pa.kegiatanId)
+                                val returnedIds = allTools.filter { it.isReturned }.map { it.id }
+                                val returnedStr = if (returnedIds.isNotEmpty()) "\nReturnedTools: ${returnedIds.joinToString(",")}" else ""
+                                val approvalTag = if (kegiatan.alat_approved) "\nStatusAlat: Approved" else ""
+                                val desc = "Peminjam: ${kegiatan.peminjam}\nLokasi: ${kegiatan.lokasi}\nKategori: ${kegiatan.kategori}${approvalTag}${returnedStr}\nDeskripsi: ${kegiatan.deskripsi}"
+                                
+                                val response = apiService.updateKegiatan(
+                                    id = kegiatan.id,
+                                    request = UpdateKegiatanRequest(
+                                        name = kegiatan.judul,
+                                        description = desc,
+                                        date = formatToLaravelDate(kegiatan.tanggal),
+                                        status = mapToLaravelStatus(kegiatan.status)
+                                    )
+                                )
+                                if (response.success) {
+                                    dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                                } else {
+                                    success = false
+                                }
+                            } else {
+                                dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            success = false
+                        }
                     }
                 } else {
                     dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
@@ -753,7 +817,12 @@ class KegiatanRepositoryImpl(
             
             if (NetworkUtils.isOnline(context)) {
                 try {
-                    val desc = "Peminjam: $peminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
+                    val allTools = dao.getAlatForKegiatan(id)
+                    val returnedIds = allTools.filter { it.isReturned }.map { it.id }
+                    val returnedStr = if (returnedIds.isNotEmpty()) "\nReturnedTools: ${returnedIds.joinToString(",")}" else ""
+                    val approvalTag = if (updated.alat_approved) "\nStatusAlat: Approved" else ""
+
+                    val desc = "Peminjam: $peminjam\nLokasi: $lokasi\nKategori: $kategori${approvalTag}${returnedStr}\nDeskripsi: $deskripsi"
                     val response = apiService.updateKegiatan(
                         id = id,
                         request = UpdateKegiatanRequest(
