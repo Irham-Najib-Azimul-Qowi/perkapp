@@ -15,7 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
@@ -41,7 +41,7 @@ import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 import java.util.Calendar
 import androidx.hilt.navigation.compose.hiltViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TambahKegiatanScreen(
     navController: NavController,
@@ -55,13 +55,14 @@ fun TambahKegiatanScreen(
     var namaAktivitas by rememberSaveable { mutableStateOf("") }
     var tanggalPinjam by rememberSaveable { mutableStateOf("") }
     var tanggalKembali by rememberSaveable { mutableStateOf("") }
-    var peminjam by rememberSaveable { mutableStateOf("") }
+    val daftarPeminjam = remember { mutableStateListOf<String>() }
+    var peminjamInput by rememberSaveable { mutableStateOf("") }
     var lokasi by rememberSaveable { mutableStateOf("") }
     var deskripsi by rememberSaveable { mutableStateOf("") }
     var dropdownTerbuka by rememberSaveable { mutableStateOf(false) }
 
     // State untuk Step 2 (Pilihan Alat)
-    val alatList by viewModel.alatList.observeAsState(emptyList())
+    val alatList by viewModel.alatList.observeAsState(emptyList<AlatEntity>())
     var selectedQuantities by remember { mutableStateOf(emptyMap<String, Int>()) }
     var externalTools by remember { mutableStateOf(emptyList<String>()) }
 
@@ -106,8 +107,6 @@ fun TambahKegiatanScreen(
     )
 
     val daftarAnggota by kegiatanViewModel.registeredUsers.collectAsState(initial = emptyList())
-    val anggotaDifilter = daftarAnggota.filter { it.contains(peminjam, ignoreCase = true) }
-
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -176,7 +175,7 @@ fun TambahKegiatanScreen(
                         Text("1", color = if (currentStep >= 1) Color.White else Color(0xFF3D4A3D), fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Info Kegiatan", fontSize = 11.sp, color = if (currentStep >= 1) MaterialTheme.colorScheme.primary else Color(0xFF6D7B6C), fontWeight = FontWeight.SemiBold)
+                    Text("Info Kegiatan", fontSize = 11.sp, color = if (currentStep >= 1) MaterialTheme.colorScheme.primary else Color(0xFF6D7B6C), fontWeight = FontWeight.Bold)
                 }
 
                 // Garis Penghubung
@@ -286,50 +285,104 @@ fun TambahKegiatanScreen(
                         )
                     }
 
-                    // 3. Peminjam (Dropdown)
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = peminjam,
-                            onValueChange = {
-                                peminjam = it
-                                dropdownTerbuka = true
-                            },
-                            label = { Text("Peminjam") },
-                            placeholder = { Text("Search members...") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusChanged { focusState ->
-                                    if (focusState.isFocused) {
-                                        dropdownTerbuka = true
-                                    }
-                                },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Cari Peminjam",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = textFieldColors,
-                            singleLine = true
+                    // 3. Peminjam (Dropdown & Chips)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Daftar Peminjam",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                        
+                        // Chips list
+                        if (daftarPeminjam.isNotEmpty()) {
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                daftarPeminjam.forEach { nama ->
+                                    InputChip(
+                                        selected = true,
+                                        onClick = { daftarPeminjam.remove(nama) },
+                                        label = { Text(nama) },
+                                        trailingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Hapus",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
-                        DropdownMenu(
-                            expanded = dropdownTerbuka && anggotaDifilter.isNotEmpty(),
-                            onDismissRequest = { dropdownTerbuka = false },
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            anggotaDifilter.forEach { nama ->
-                                DropdownMenuItem(
-                                    text = { Text(nama) },
-                                    onClick = {
-                                        peminjam = nama
-                                        dropdownTerbuka = false
-                                    }
-                                )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = peminjamInput,
+                                onValueChange = {
+                                    peminjamInput = it
+                                    dropdownTerbuka = true
+                                },
+                                label = { Text("Peminjam") },
+                                placeholder = { Text("Ketik nama kustom atau cari user...") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            dropdownTerbuka = true
+                                        }
+                                    },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Cari Peminjam",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = textFieldColors,
+                                singleLine = true
+                            )
+
+                            val anggotaDifilter = daftarAnggota.filter { 
+                                it.contains(peminjamInput, ignoreCase = true) && !daftarPeminjam.contains(it) 
+                            }
+
+                            DropdownMenu(
+                                expanded = dropdownTerbuka && (anggotaDifilter.isNotEmpty() || peminjamInput.isNotBlank()),
+                                onDismissRequest = { dropdownTerbuka = false },
+                                modifier = Modifier
+                                    .fillMaxWidth(0.9f)
+                                    .background(MaterialTheme.colorScheme.surface)
+                            ) {
+                                // Mendaftarkan custom name jika diketik
+                                if (peminjamInput.isNotBlank() && !daftarPeminjam.contains(peminjamInput)) {
+                                    DropdownMenuItem(
+                                        text = { Text("+ Tambah '$peminjamInput'") },
+                                        onClick = {
+                                            daftarPeminjam.add(peminjamInput.trim())
+                                            peminjamInput = ""
+                                            dropdownTerbuka = false
+                                        }
+                                    )
+                                }
+                                
+                                // Daftar anggota sistem yang terdaftar
+                                anggotaDifilter.forEach { nama ->
+                                    DropdownMenuItem(
+                                        text = { Text(nama) },
+                                        onClick = {
+                                            daftarPeminjam.add(nama)
+                                            peminjamInput = ""
+                                            dropdownTerbuka = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -371,10 +424,10 @@ fun TambahKegiatanScreen(
                 ) {
                     Button(
                         onClick = {
-                            if (namaAktivitas.isNotBlank() && tanggalPinjam.isNotBlank() && peminjam.isNotBlank() && lokasi.isNotBlank()) {
+                            if (namaAktivitas.isNotBlank() && tanggalPinjam.isNotBlank() && daftarPeminjam.isNotEmpty() && lokasi.isNotBlank()) {
                                 currentStep = 2
                             } else {
-                                Toast.makeText(context, "Silakan lengkapi data wajib (Nama, Tanggal, Peminjam, Lokasi)!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Silakan lengkapi data wajib (Nama, Tanggal, Peminjam/Chips, Lokasi)!", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier
@@ -400,46 +453,29 @@ fun TambahKegiatanScreen(
             } else {
                 // STEP 2 FORM (Pilihan Alat Inventaris)
                 Column(
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Header list & Button ke TambahAlatLuar
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "Pilih Alat dari Inventaris",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-
-                        // Button to TambahAlatLuarScreen
-                        OutlinedButton(
+                        Button(
                             onClick = {
                                 navController.navigate(Screen.TambahAlatLuar.route)
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "Pinjam Alat Luar",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Alat Luar", fontSize = 12.sp)
                         }
                     }
 
@@ -560,12 +596,16 @@ fun TambahKegiatanScreen(
                                     .filter { it.value > 0 }
                                     .map { Pair(it.key, it.value) }
 
+                                val peminjamString = daftarPeminjam.joinToString(", ")
+
                                 kegiatanViewModel.insertKegiatan(
                                     judul = namaAktivitas,
                                     kategori = "Umum",
                                     lokasi = lokasi,
                                     tanggal = tanggalPinjam,
                                     status = "BERLANGSUNG",
+                                    peminjam = peminjamString,
+                                    deskripsi = deskripsi,
                                     tools = selectedToolsList,
                                     externalTools = externalTools.toList(),
                                     onSuccess = {

@@ -41,7 +41,9 @@ data class Aktivitas(
     val status: StatusAktivitas, // Status pengerjaan saat ini
     val progress: Float, // Progres pengerjaan (0.0f - 1.0f)
     val tanggal: String, // Informasi tanggal atau status langsung
-    val isPending: Boolean = false // Status sync
+    val isPending: Boolean = false, // Status sync
+    val peminjam: String = "",
+    val realDeskripsi: String = ""
 )
 
 /**

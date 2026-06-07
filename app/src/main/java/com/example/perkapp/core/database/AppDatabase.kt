@@ -20,7 +20,7 @@ import com.example.perkapp.features.media.data.ImageEntity
 
 @Database(
     entities = [UserEntity::class, AlatEntity::class, ImageEntity::class, KegiatanEntity::class, KegiatanAlatEntity::class, RegisteredUserEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

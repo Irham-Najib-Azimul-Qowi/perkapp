@@ -1,35 +1,41 @@
 package com.example.perkapp.features.kegiatan.api
 
-import retrofit2.http.GET
-import retrofit2.http.Path
-import retrofit2.http.Query
-
-// ============================================================
-// FILE: KegiatanApiService.kt
-// LOKASI: features/kegiatan/api/KegiatanApiService.kt
-// FUNGSI: Mendefinisikan endpoint API untuk fitur kegiatan.
-//         Retrofit akan otomatis membuat implementasinya.
-//
-// CATATAN: File ini bergantung pada RetrofitClient.kt milik Adam.
-//          Koordinasi dengan Adam untuk memastikan base URL
-//          dan header autentikasi sudah terpasang di sana.
-// ============================================================
-
+import retrofit2.http.*
 
 // Response DTO dari API untuk satu kegiatan
-// DTO = Data Transfer Object, bentuk data yang datang dari server
-// Berbeda dengan domain model (Kegiatan.kt) karena nama field
-// mengikuti format JSON dari backend (snake_case)
 data class KegiatanResponse(
     val id: String,
-    val kategori: String,
-    val judul: String,
-    val lokasi: String,
-    val label_waktu: String,    // snake_case dari JSON backend
-    val progress: Float,
-    val status: String          // "AKTIF", "MAINTENANCE", "AUDIT"
+    val name: String?,
+    val description: String?,
+    val date: String?,
+    val status: String?,
+    val created_by: String?,
+    val alats: List<AlatPivotResponse>? = null
 )
 
+data class AlatPivotResponse(
+    val id: String,
+    val name: String,
+    val category: String,
+    val image_path: String?,
+    val pivot: PivotQty?
+)
+
+data class PivotQty(
+    val qty: Int
+)
+
+data class KegiatanListWrapperResponse(
+    val success: Boolean,
+    val message: String,
+    val data: List<KegiatanResponse>
+)
+
+data class KegiatanWrapperResponse(
+    val success: Boolean,
+    val message: String,
+    val data: KegiatanResponse
+)
 
 // Response DTO untuk statistik inventori
 data class InventoryStatsResponse(
@@ -38,34 +44,72 @@ data class InventoryStatsResponse(
     val pending_sync_count: Int
 )
 
-
-// Response wrapper dari API (koordinasi dengan Adam soal format ini)
+// Response wrapper dari API
 data class HomeDataResponse(
     val stats: InventoryStatsResponse,
     val kegiatan_aktif: List<KegiatanResponse>
 )
 
+data class CreateKegiatanRequest(
+    val id: String? = null,
+    val name: String,
+    val description: String?,
+    val date: String,
+    val status: String
+)
+
+data class UpdateKegiatanRequest(
+    val name: String,
+    val description: String?,
+    val date: String,
+    val status: String
+)
+
+data class AddToolToKegiatanRequest(
+    val kegiatan_id: String,
+    val alat_id: String,
+    val qty: Int
+)
+
+data class GeneralApiResponse(
+    val success: Boolean,
+    val message: String
+)
 
 // Interface endpoint API untuk fitur kegiatan
-// Retrofit membaca anotasi @GET, @POST, dll untuk tahu cara request
 interface KegiatanApiService {
 
-    // Ambil semua data yang dibutuhkan halaman Home sekaligus
-    // GET /home/data
     @GET("home/data")
     suspend fun getHomeData(): HomeDataResponse
 
-    // Ambil daftar semua kegiatan (untuk halaman "See All")
-    // GET /kegiatan?status=aktif
     @GET("kegiatan")
     suspend fun getSemuaKegiatan(
-        @Query("status") status: String? = null  // filter opsional: "aktif", "selesai", dll
-    ): List<KegiatanResponse>
+        @Query("status") status: String? = null
+    ): KegiatanListWrapperResponse
 
-    // Ambil detail satu kegiatan berdasarkan ID
-    // GET /kegiatan/{id}
     @GET("kegiatan/{id}")
     suspend fun getDetailKegiatan(
         @Path("id") id: String
-    ): KegiatanResponse
+    ): KegiatanWrapperResponse
+
+    @POST("kegiatan")
+    suspend fun createKegiatan(
+        @Body request: CreateKegiatanRequest
+    ): KegiatanWrapperResponse
+
+    @PUT("kegiatan/{id}")
+    suspend fun updateKegiatan(
+        @Path("id") id: String,
+        @Body request: UpdateKegiatanRequest
+    ): KegiatanWrapperResponse
+
+    @DELETE("kegiatan/{id}")
+    suspend fun deleteKegiatan(
+        @Path("id") id: String
+    ): GeneralApiResponse
+
+    @POST("kegiatan-alat")
+    suspend fun addToolToKegiatan(
+        @Body request: AddToolToKegiatanRequest
+    ): GeneralApiResponse
 }

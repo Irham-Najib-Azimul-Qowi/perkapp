@@ -6,12 +6,44 @@ import com.example.perkapp.core.database.dao.KegiatanDao
 import com.example.perkapp.core.database.entity.KegiatanEntity
 import com.example.perkapp.core.database.entity.KegiatanAlatEntity
 import com.example.perkapp.core.utils.NetworkUtils
-import com.example.perkapp.features.kegiatan.api.KegiatanApiService
+import com.example.perkapp.features.kegiatan.api.*
 import com.example.perkapp.features.kegiatan.domain.InventoryStats
 import com.example.perkapp.features.kegiatan.domain.Kegiatan
 import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 import com.example.perkapp.features.kegiatan.domain.UserInfo
 import java.util.*
+import kotlinx.coroutines.flow.first
+
+data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String)
+
+fun parseDescription(fullDesc: String?): ParsedDescription {
+    if (fullDesc == null) return ParsedDescription("", "", "", "")
+    var peminjam = ""
+    var lokasi = ""
+    var kategori = ""
+    var deskripsi = ""
+    
+    val lines = fullDesc.split("\n")
+    for (line in lines) {
+        val trimmed = line.trim()
+        when {
+            trimmed.startsWith("Peminjam: ") -> peminjam = trimmed.removePrefix("Peminjam: ")
+            trimmed.startsWith("Lokasi: ") -> lokasi = trimmed.removePrefix("Lokasi: ")
+            trimmed.startsWith("Kategori: ") -> kategori = trimmed.removePrefix("Kategori: ")
+            trimmed.startsWith("Deskripsi: ") -> deskripsi = trimmed.removePrefix("Deskripsi: ")
+            else -> {
+                if (trimmed.isNotBlank()) {
+                    if (deskripsi.isEmpty()) {
+                        deskripsi = trimmed
+                    } else {
+                        deskripsi += "\n$trimmed"
+                    }
+                }
+            }
+        }
+    }
+    return ParsedDescription(peminjam, lokasi, kategori, deskripsi)
+}
 
 interface KegiatanRepository {
     suspend fun getInventoryStats(): Result<InventoryStats>
@@ -27,6 +59,8 @@ interface KegiatanRepository {
         lokasi: String,
         tanggal: String,
         status: String,
+        peminjam: String,
+        deskripsi: String,
         tools: List<Pair<String, Int>>,
         externalTools: List<String>
     ): String
@@ -40,7 +74,9 @@ interface KegiatanRepository {
         kategori: String,
         lokasi: String,
         tanggal: String,
-        status: String
+        status: String,
+        peminjam: String,
+        deskripsi: String
     )
 }
 
@@ -50,6 +86,40 @@ class KegiatanRepositoryImpl(
     private val context: Context
 ) : KegiatanRepository {
 
+    private fun formatToLaravelDate(localDate: String): String {
+        val parts = localDate.split("/")
+        if (parts.size == 3) {
+            return "${parts[2]}-${parts[1]}-${parts[0]}"
+        }
+        return localDate
+    }
+
+    private fun formatFromLaravelDate(laravelDate: String?): String {
+        if (laravelDate.isNullOrBlank()) return "01/01/2026"
+        val cleanDate = laravelDate.split(" ").firstOrNull() ?: laravelDate
+        val parts = cleanDate.split("-")
+        if (parts.size == 3) {
+            return "${parts[2]}/${parts[1]}/${parts[0]}"
+        }
+        return cleanDate
+    }
+
+    private fun mapToLaravelStatus(localStatus: String): String {
+        return when (localStatus.uppercase()) {
+            "BERLANGSUNG" -> "ongoing"
+            "SELESAI" -> "completed"
+            else -> "draft"
+        }
+    }
+
+    private fun mapFromLaravelStatus(laravelStatus: String?): String {
+        return when (laravelStatus?.lowercase()) {
+            "ongoing" -> "BERLANGSUNG"
+            "completed" -> "SELESAI"
+            else -> "DRAFT"
+        }
+    }
+
     override suspend fun getInventoryStats(): Result<InventoryStats> {
         return try {
             val db = AppDatabase.getDatabase(context)
@@ -58,9 +128,6 @@ class KegiatanRepositoryImpl(
             
             val availableCount = allAlat.sumOf { it.available_qty }
             val pendingSyncCount = allAlat.count { it.sync_status == "pending" }
-            
-            val borrowedAlats = dao.getPendingKegiatanAlat() // get all tools
-            val borrowedCount = dao.getAlatForKegiatan("").filter { !it.isReturned }.size // simple count
             
             // Query total active borrowed tools
             val allKegiatanAlat = db.openHelper.readableDatabase.compileStatement(
@@ -81,6 +148,59 @@ class KegiatanRepositoryImpl(
     }
 
     override suspend fun getKegiatanAktif(): Result<List<Kegiatan>> {
+        // Fetch from server first if online to ensure latest activities show up to all users
+        if (NetworkUtils.isOnline(context)) {
+            try {
+                val response = apiService.getSemuaKegiatan()
+                if (response.success) {
+                    val db = AppDatabase.getDatabase(context)
+                    val alatDao = db.alatDao()
+                    
+                    for (kegDto in response.data) {
+                        val localCopy = dao.getKegiatanById(kegDto.id)
+                        if (localCopy == null || localCopy.sync_status != "pending") {
+                            val parsed = parseDescription(kegDto.description)
+                            val kegiatanEntity = KegiatanEntity(
+                                id = kegDto.id,
+                                judul = kegDto.name ?: "",
+                                kategori = parsed.kategori.ifBlank { "Umum" },
+                                lokasi = parsed.lokasi,
+                                tanggal = formatFromLaravelDate(kegDto.date),
+                                status = mapFromLaravelStatus(kegDto.status),
+                                peminjam = parsed.peminjam,
+                                deskripsi = parsed.deskripsi,
+                                sync_status = "synced",
+                                pending_action = null
+                            )
+                            dao.insertKegiatan(kegiatanEntity)
+                            
+                            // Synced tools
+                            kegDto.alats?.forEach { alatDto ->
+                                val localTool = alatDao.getAlatById(alatDto.id)
+                                val toolImagePath = localTool?.image_path ?: alatDto.image_path
+                                val kaEntity = KegiatanAlatEntity(
+                                    id = "${kegDto.id}_${alatDto.id}",
+                                    kegiatanId = kegDto.id,
+                                    alatId = alatDto.id,
+                                    name = alatDto.name,
+                                    category = alatDto.category,
+                                    qty = alatDto.pivot?.qty ?: 1,
+                                    isExternal = false,
+                                    isReturned = kegDto.status == "completed",
+                                    image_path = toolImagePath,
+                                    sync_status = "synced",
+                                    pending_action = null
+                                )
+                                dao.insertKegiatanAlat(kaEntity)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         return try {
             val entities = dao.getAllKegiatan().filter { it.status == "BERLANGSUNG" }
             val domainList = entities.map { entity ->
@@ -90,7 +210,7 @@ class KegiatanRepositoryImpl(
                     judul = entity.judul,
                     lokasi = entity.lokasi,
                     labelWaktu = entity.tanggal,
-                    progress = 0f, // progress removed as requested
+                    progress = 0f,
                     statusType = when (entity.status) {
                         "BERLANGSUNG" -> StatusKegiatan.AKTIF
                         "MAINTENANCE" -> StatusKegiatan.MAINTENANCE
@@ -106,10 +226,16 @@ class KegiatanRepositoryImpl(
     }
 
     override suspend fun getUserInfo(): UserInfo {
+        val db = AppDatabase.getDatabase(context)
+        val userDao = db.userDao()
+        val userEntity = userDao.getUser().first()
+        val name = userEntity?.name ?: "User Perkapp"
+        val role = userEntity?.role ?: "member"
         return UserInfo(
-            nama = "Reja",
+            nama = name,
             sapaan = getSapaanBerdasarkanJam(),
-            fotoUrl = ""
+            fotoUrl = "",
+            role = role
         )
     }
 
@@ -150,6 +276,8 @@ class KegiatanRepositoryImpl(
         lokasi: String,
         tanggal: String,
         status: String,
+        peminjam: String,
+        deskripsi: String,
         tools: List<Pair<String, Int>>,
         externalTools: List<String>
     ): String {
@@ -161,6 +289,8 @@ class KegiatanRepositoryImpl(
             lokasi = lokasi,
             tanggal = tanggal,
             status = status,
+            peminjam = peminjam,
+            deskripsi = deskripsi,
             sync_status = "pending",
             pending_action = "create"
         )
@@ -176,7 +306,7 @@ class KegiatanRepositoryImpl(
             val imagePath = toolEntity?.image_path
             
             val kegiatanAlat = KegiatanAlatEntity(
-                id = UUID.randomUUID().toString(),
+                id = "${kegiatanId}_${toolId}",
                 kegiatanId = kegiatanId,
                 alatId = toolId,
                 name = name,
@@ -222,11 +352,38 @@ class KegiatanRepositoryImpl(
         // Try direct sync if online
         if (NetworkUtils.isOnline(context)) {
             try {
-                // Emulate sync success (in real production, call KegiatanApiService)
-                dao.insertKegiatan(kegiatan.copy(sync_status = "synced", pending_action = null))
-                val alats = dao.getAlatForKegiatan(kegiatanId)
-                for (a in alats) {
-                    dao.insertKegiatanAlat(a.copy(sync_status = "synced", pending_action = null))
+                val desc = "Peminjam: $peminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
+                val response = apiService.createKegiatan(
+                    CreateKegiatanRequest(
+                        id = kegiatanId,
+                        name = judul,
+                        description = desc,
+                        date = formatToLaravelDate(tanggal),
+                        status = mapToLaravelStatus(status)
+                    )
+                )
+                if (response.success) {
+                    dao.insertKegiatan(kegiatan.copy(sync_status = "synced", pending_action = null))
+                    
+                    // Sync internal tools
+                    for ((toolId, qty) in tools) {
+                        try {
+                            apiService.addToolToKegiatan(
+                                AddToolToKegiatanRequest(
+                                    kegiatan_id = kegiatanId,
+                                    alat_id = toolId,
+                                    qty = qty
+                                )
+                            )
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    
+                    val alats = dao.getAlatForKegiatan(kegiatanId)
+                    for (a in alats) {
+                        dao.insertKegiatanAlat(a.copy(sync_status = "synced", pending_action = null))
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -240,14 +397,8 @@ class KegiatanRepositoryImpl(
         val db = AppDatabase.getDatabase(context)
         val alatDao = db.alatDao()
         
-        // Find by querying all alat for kegiatan since we don't have getById for kegiatan_alat
-        // Let's use SQLite readable database to query it quickly or find in list
-        val allPending = dao.getPendingKegiatanAlat()
-        // Instead, let's load all and filter
-        // Actually, we can get the specific entity by looking it up
-        val matches = dao.getPendingKegiatanAlat().find { it.id == kegiatanAlatId }
+        val matches = dao.getAlatForKegiatan("").find { it.id == kegiatanAlatId }
             ?: db.openHelper.readableDatabase.let {
-                // Fallback query to find it
                 var found: KegiatanAlatEntity? = null
                 val cursor = it.query("SELECT * FROM kegiatan_alat WHERE id = '$kegiatanAlatId'")
                 if (cursor.moveToFirst()) {
@@ -299,6 +450,8 @@ class KegiatanRepositoryImpl(
 
             if (NetworkUtils.isOnline(context)) {
                 try {
+                    // If returning a tool on server, it usually is handled by completing the activity,
+                    // but we mark synced locally to ensure consistency.
                     dao.updateKegiatanAlat(updated.copy(sync_status = "synced", pending_action = null))
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -308,17 +461,54 @@ class KegiatanRepositoryImpl(
     }
 
     override suspend fun syncPendingKegiatan(): Boolean {
+        if (!NetworkUtils.isOnline(context)) return false
         var success = true
         try {
             val pendingKegiatan = dao.getPendingKegiatan()
             for (keg in pendingKegiatan) {
-                // Try to sync with server
-                // Since this is mock/concept, we mark synced
-                dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
+                if (keg.pending_action == "create") {
+                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}\nDeskripsi: ${keg.deskripsi}"
+                    val response = apiService.createKegiatan(
+                        CreateKegiatanRequest(
+                            id = keg.id,
+                            name = keg.judul,
+                            description = desc,
+                            date = formatToLaravelDate(keg.tanggal),
+                            status = mapToLaravelStatus(keg.status)
+                        )
+                    )
+                    if (response.success) {
+                        dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
+                    } else {
+                        success = false
+                    }
+                } else if (keg.pending_action == "update") {
+                    val desc = "Peminjam: ${keg.peminjam}\nLokasi: ${keg.lokasi}\nKategori: ${keg.kategori}\nDeskripsi: ${keg.deskripsi}"
+                    val response = apiService.updateKegiatan(
+                        id = keg.id,
+                        request = UpdateKegiatanRequest(
+                            name = keg.judul,
+                            description = desc,
+                            date = formatToLaravelDate(keg.tanggal),
+                            status = mapToLaravelStatus(keg.status)
+                        )
+                    )
+                    if (response.success) {
+                        dao.insertKegiatan(keg.copy(sync_status = "synced", pending_action = null))
+                    } else {
+                        success = false
+                    }
+                } else if (keg.pending_action == "delete") {
+                    val response = apiService.deleteKegiatan(keg.id)
+                    if (response.success) {
+                        dao.deleteKegiatan(keg.id)
+                    } else {
+                        success = false
+                    }
+                }
             }
 
-            // Sync pending tool return status changes
-            // Since we can't easily query all from Room without getPending, we query via SQLite helper
+            // Sync pending tools
             val db = AppDatabase.getDatabase(context)
             val sdb = db.openHelper.writableDatabase
             val cursor = sdb.query("SELECT * FROM kegiatan_alat WHERE sync_status = 'pending'")
@@ -338,13 +528,33 @@ class KegiatanRepositoryImpl(
                     null
                 }
                 pendingAlats.add(
-                    KegiatanAlatEntity(id, kId, aId, name, cat, qty, isExt, isRet, "pending", "update", imgPath)
+                    KegiatanAlatEntity(id, kId, aId, name, cat, qty, isExt, isRet, "pending", "create", imgPath)
                 )
             }
             cursor.close()
 
             for (pa in pendingAlats) {
-                dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                if (!pa.isExternal) {
+                    try {
+                        val response = apiService.addToolToKegiatan(
+                            AddToolToKegiatanRequest(
+                                kegiatan_id = pa.kegiatanId,
+                                alat_id = pa.alatId,
+                                qty = pa.qty
+                            )
+                        )
+                        if (response.success) {
+                            dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                        } else {
+                            success = false
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        success = false
+                    }
+                } else {
+                    dao.updateKegiatanAlat(pa.copy(sync_status = "synced", pending_action = null))
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -370,6 +580,15 @@ class KegiatanRepositoryImpl(
         
         dao.deleteKegiatan(kegiatanId)
         dao.deleteKegiatanAlatForKegiatan(kegiatanId)
+
+        if (NetworkUtils.isOnline(context)) {
+            try {
+                apiService.deleteKegiatan(kegiatanId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Mark deleted locally and pending delete on server (we already deleted locally, so in Room it's gone)
+            }
+        }
     }
 
     override suspend fun updateKegiatanLocal(
@@ -378,7 +597,9 @@ class KegiatanRepositoryImpl(
         kategori: String,
         lokasi: String,
         tanggal: String,
-        status: String
+        status: String,
+        peminjam: String,
+        deskripsi: String
     ) {
         val existing = dao.getKegiatanById(id)
         if (existing != null) {
@@ -388,15 +609,28 @@ class KegiatanRepositoryImpl(
                 lokasi = lokasi,
                 tanggal = tanggal,
                 status = status,
+                peminjam = peminjam,
+                deskripsi = deskripsi,
                 sync_status = "pending",
                 pending_action = "update"
             )
             dao.updateKegiatan(updated)
             
-            // Coba sinkronisasi langsung jika online
             if (NetworkUtils.isOnline(context)) {
                 try {
-                    dao.insertKegiatan(updated.copy(sync_status = "synced", pending_action = null))
+                    val desc = "Peminjam: $peminjam\nLokasi: $lokasi\nKategori: $kategori\nDeskripsi: $deskripsi"
+                    val response = apiService.updateKegiatan(
+                        id = id,
+                        request = UpdateKegiatanRequest(
+                            name = judul,
+                            description = desc,
+                            date = formatToLaravelDate(tanggal),
+                            status = mapToLaravelStatus(status)
+                        )
+                    )
+                    if (response.success) {
+                        dao.insertKegiatan(updated.copy(sync_status = "synced", pending_action = null))
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -423,9 +657,11 @@ class FakeKegiatanRepository(private val context: Context) : KegiatanRepository 
         lokasi: String,
         tanggal: String,
         status: String,
+        peminjam: String,
+        deskripsi: String,
         tools: List<Pair<String, Int>>,
         externalTools: List<String>
-    ) = impl.insertKegiatanLocal(judul, kategori, lokasi, tanggal, status, tools, externalTools)
+    ) = impl.insertKegiatanLocal(judul, kategori, lokasi, tanggal, status, peminjam, deskripsi, tools, externalTools)
 
     override suspend fun updateKegiatanAlatStatusLocal(kegiatanAlatId: String, isReturned: Boolean) =
         impl.updateKegiatanAlatStatusLocal(kegiatanAlatId, isReturned)
@@ -440,6 +676,8 @@ class FakeKegiatanRepository(private val context: Context) : KegiatanRepository 
         kategori: String,
         lokasi: String,
         tanggal: String,
-        status: String
-    ) = impl.updateKegiatanLocal(id, judul, kategori, lokasi, tanggal, status)
+        status: String,
+        peminjam: String,
+        deskripsi: String
+    ) = impl.updateKegiatanLocal(id, judul, kategori, lokasi, tanggal, status, peminjam, deskripsi)
 }

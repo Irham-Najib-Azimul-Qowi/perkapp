@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
@@ -52,6 +51,7 @@ fun DetailKegiatanScreen(
     val context = LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     val uiState by viewModel.uiState.collectAsState()
+    val currentUserInfo by viewModel.currentUserInfo.collectAsState()
 
     // Normalize IDs (e.g. 101 -> 1, 102 -> 2, 103 -> 3)
     val normalizedId = remember(kegiatanId) {
@@ -65,6 +65,7 @@ fun DetailKegiatanScreen(
     LaunchedEffect(kegiatanId) {
         viewModel.loadActivities()
         viewModel.loadAlatForKegiatan(kegiatanId)
+        viewModel.loadCurrentUserInfo()
     }
 
     val aktivitas = remember(uiState.aktivitasList, normalizedId) {
@@ -72,6 +73,17 @@ fun DetailKegiatanScreen(
     }
 
     val toolList = uiState.currentDetailAlatList
+
+    // Access permissions logic
+    val currentUserName = currentUserInfo?.nama ?: ""
+    val currentUserRole = currentUserInfo?.role ?: "member"
+    val isAdmin = currentUserRole.lowercase() == "admin"
+    val peminjamList = remember(aktivitas?.peminjam) {
+        aktivitas?.peminjam?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+    }
+    val hasAccess = remember(isAdmin, peminjamList, currentUserName) {
+        isAdmin || peminjamList.any { it.equals(currentUserName, ignoreCase = true) }
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -134,7 +146,7 @@ fun DetailKegiatanScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = 16.dp)
             ) {
-                // Card Info Detail Kegiatan (No Image, matching requirements)
+                // Card Info Detail Kegiatan
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -187,6 +199,8 @@ fun DetailKegiatanScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         DetailInfoRow(label = "Tanggal", value = data.tanggal)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        DetailInfoRow(label = "Peminjam", value = data.peminjam.ifBlank { "-" })
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
@@ -198,7 +212,7 @@ fun DetailKegiatanScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = data.deskripsi,
+                            text = data.realDeskripsi.ifBlank { "Tidak ada deskripsi." },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -231,6 +245,10 @@ fun DetailKegiatanScreen(
                     DetailKegiatanToolCard(
                         tool = tool,
                         onClick = {
+                            if (!hasAccess) {
+                                Toast.makeText(context, "Hanya user/peminjam terdaftar yang dapat mengabsen alat!", Toast.LENGTH_LONG).show()
+                                return@DetailKegiatanToolCard
+                            }
                             val nextState = !toolEntity.isReturned
                             viewModel.updateKegiatanAlatStatus(toolEntity.id, nextState, kegiatanId)
                             
@@ -250,61 +268,64 @@ fun DetailKegiatanScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Edit Button
-                Button(
-                    onClick = { onEditClick(data.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Edit Kegiatan",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                // Action buttons only visible if user has access (Creator/Borrower/Admin)
+                if (hasAccess) {
+                    // Edit Button
+                    Button(
+                        onClick = { onEditClick(data.id) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Edit Kegiatan",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Delete Button
+                    OutlinedButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                            brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error)
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Hapus Kegiatan",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Delete Button
-                OutlinedButton(
-                    onClick = { showDeleteDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.error)
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Hapus Kegiatan",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 // Back Button
                 TextButton(

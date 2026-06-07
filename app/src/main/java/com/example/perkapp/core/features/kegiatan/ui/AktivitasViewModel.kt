@@ -11,6 +11,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import com.example.perkapp.core.datastore.dataStore
+import com.example.perkapp.features.kegiatan.domain.UserInfo
 
 data class AktivitasUiState(
     val aktivitasList: List<Aktivitas> = emptyList(),
@@ -34,11 +35,13 @@ class AktivitasViewModel @Inject constructor(
     private val _allAktivitas = MutableStateFlow<List<Aktivitas>>(emptyList())
 
     val registeredUsers = MutableStateFlow<List<String>>(emptyList())
+    val currentUserInfo = MutableStateFlow<UserInfo?>(null)
 
     init {
         loadActivities()
         observeNetworkChanges()
         fetchRegisteredUsers()
+        loadCurrentUserInfo()
     }
 
     private fun observeNetworkChanges() {
@@ -53,9 +56,20 @@ class AktivitasViewModel @Inject constructor(
                         } finally {
                             loadActivities()
                             fetchRegisteredUsers()
+                            loadCurrentUserInfo()
                         }
                     }
                 }
+        }
+    }
+
+    fun loadCurrentUserInfo() {
+        viewModelScope.launch {
+            try {
+                currentUserInfo.value = repository.getUserInfo()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -127,7 +141,10 @@ class AktivitasViewModel @Inject constructor(
                                 else -> StatusAktivitas.DRAFT
                             },
                             progress = 0f,
-                            tanggal = entity.tanggal
+                            tanggal = entity.tanggal,
+                            isPending = entity.sync_status == "pending",
+                            peminjam = entity.peminjam,
+                            realDeskripsi = entity.deskripsi
                         )
                     }
                 _allAktivitas.value = mapped
@@ -168,6 +185,8 @@ class AktivitasViewModel @Inject constructor(
         lokasi: String,
         tanggal: String,
         status: String,
+        peminjam: String,
+        deskripsi: String,
         tools: List<Pair<String, Int>>,
         externalTools: List<String>,
         onSuccess: () -> Unit
@@ -180,6 +199,8 @@ class AktivitasViewModel @Inject constructor(
                     lokasi = lokasi,
                     tanggal = tanggal,
                     status = status,
+                    peminjam = peminjam,
+                    deskripsi = deskripsi,
                     tools = tools,
                     externalTools = externalTools
                 )
@@ -197,11 +218,13 @@ class AktivitasViewModel @Inject constructor(
         lokasi: String,
         tanggal: String,
         status: String,
+        peminjam: String,
+        deskripsi: String,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             try {
-                repository.updateKegiatanLocal(id, judul, kategori, lokasi, tanggal, status)
+                repository.updateKegiatanLocal(id, judul, kategori, lokasi, tanggal, status, peminjam, deskripsi)
                 loadActivities()
                 onSuccess()
             } catch (e: Exception) {

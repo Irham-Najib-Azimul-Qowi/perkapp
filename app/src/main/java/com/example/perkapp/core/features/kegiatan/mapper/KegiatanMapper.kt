@@ -20,21 +20,23 @@ import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 // ============================================================
 
 
+import com.example.perkapp.features.kegiatan.data.parseDescription
+
 // Mengubah KegiatanResponse (dari API) → Kegiatan (domain model)
 fun KegiatanResponse.toDomain(): Kegiatan {
+    val parsed = parseDescription(this.description)
     return Kegiatan(
         id = this.id,
-        kategori = this.kategori,
-        judul = this.judul,
-        lokasi = this.lokasi,
-        labelWaktu = this.label_waktu,
-        progress = this.progress.coerceIn(0f, 1f), // Pastikan nilai 0.0 - 1.0
-        statusType = when (this.status.uppercase()) {
-            // Konversi string "AKTIF" dari API → enum StatusKegiatan.AKTIF
-            "AKTIF"       -> StatusKegiatan.AKTIF
-            "MAINTENANCE" -> StatusKegiatan.MAINTENANCE
-            "AUDIT"       -> StatusKegiatan.AUDIT
-            else          -> StatusKegiatan.AKTIF  // default jika tidak dikenal
+        kategori = parsed.kategori.ifBlank { "Umum" },
+        judul = this.name ?: "",
+        lokasi = parsed.lokasi.ifBlank { "Unknown" },
+        labelWaktu = this.date ?: "",
+        progress = if (this.status?.uppercase() == "SELESAI") 1f else 0f,
+        statusType = when (this.status?.uppercase() ?: "AKTIF") {
+            "AKTIF", "BERLANGSUNG" -> StatusKegiatan.AKTIF
+            "MAINTENANCE"          -> StatusKegiatan.MAINTENANCE
+            "AUDIT"                -> StatusKegiatan.AUDIT
+            else                   -> StatusKegiatan.AKTIF
         }
     )
 }

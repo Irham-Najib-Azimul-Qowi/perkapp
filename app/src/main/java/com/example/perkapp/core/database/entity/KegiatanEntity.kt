@@ -12,6 +12,8 @@ data class KegiatanEntity(
     val lokasi: String,
     val tanggal: String,
     val status: String, // "BERLANGSUNG", "SELESAI", "DRAFT"
+    val peminjam: String = "",
+    val deskripsi: String = "",
     val sync_status: String = "synced",
     val pending_action: String? = null
 )

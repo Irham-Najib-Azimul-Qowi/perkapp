@@ -45,7 +45,8 @@ enum class StatusKegiatan {
 data class UserInfo(
     val nama: String,       // Nama user, contoh: "Alex"
     val sapaan: String,     // Berdasarkan jam: "Good Morning", "Good Afternoon"
-    val fotoUrl: String     // URL foto profil user
+    val fotoUrl: String,    // URL foto profil user
+    val role: String = "member" // Role user: admin atau member
 )
 
 
