@@ -16,9 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.perkapp.core.Injection
-
 import com.example.perkapp.core.utils.NetworkUtils
 
+/**
+ * ProfileScreen — Halaman profil pengguna dan opsi Logout.
+ *
+ * Menampilkan nama dan role user (admin/user), serta status jaringan (online/offline).
+ * Jika user adalah admin, akan ada tombol untuk masuk ke halaman Inventaris.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -28,20 +33,26 @@ fun ProfileScreen(
         factory = AuthViewModelFactory(Injection.provideAuthRepository(LocalContext.current))
     )
 ) {
+    // Membaca data pengguna yang saat ini sedang login dari Room Database
     val currentUser by viewModel.currentUser.collectAsState(initial = null)
+    
     val context = LocalContext.current
+    // Mengamati apakah HP sedang konek ke internet atau tidak secara realtime
     val isOnlineState by remember(context) {
         NetworkUtils.observeNetworkStatus(context)
     }.collectAsState(initial = NetworkUtils.isOnline(context))
 
+    // Mengambil token untuk memastikan user masih login
     val token by viewModel.authToken.collectAsState(initial = "LOADING")
     
+    // Jika token mendadak kosong (misal akibat di-logout dari sistem), lempar user kembali ke halaman Login
     LaunchedEffect(token) {
         if (token != "LOADING" && token.isNullOrEmpty()) {
             onLogoutSuccess()
         }
     }
 
+    // Scaffold menyediakan kerangka dasar layar (TopBar + Konten Utama)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -69,7 +80,9 @@ fun ProfileScreen(
         ) {
             Spacer(modifier = Modifier.height(32.dp))
             
+            // Jika data user sudah berhasil dimuat dari database
             if (currentUser != null) {
+                // --- Nama dan Email ---
                 Text(
                     text = currentUser!!.name,
                     style = MaterialTheme.typography.headlineMedium,
@@ -85,13 +98,16 @@ fun ProfileScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
+                // --- Baris Label Role & Status Online ---
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Label Peran (Admin atau User Biasa)
                     Box(
                         modifier = Modifier
                             .background(
+                                // Warnanya dibedakan: Admin (warna primary), User biasa (warna secondary)
                                 color = if (currentUser!!.role == "admin") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
                                 shape = RoundedCornerShape(8.dp)
                             )
@@ -105,15 +121,17 @@ fun ProfileScreen(
                         )
                     }
 
+                    // Label Status Koneksi Internet
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .background(
-                                color = if (isOnlineState) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                                color = if (isOnlineState) Color(0xFFE8F5E9) else Color(0xFFFFEBEE), // Hijau jika online, Merah jika offline
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
+                        // Titik warna indikator online/offline
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
@@ -134,6 +152,8 @@ fun ProfileScreen(
                 
                 Spacer(modifier = Modifier.height(48.dp))
                 
+                // --- Menu Khusus Admin ---
+                // Hanya muncul jika tipe user adalah admin
                 if (currentUser!!.role == "admin") {
                     Button(
                         onClick = onNavigateToInventaris,
@@ -152,12 +172,15 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             } else {
+                // Menampilkan efek putar jika data profil belum selesai dimuat
                 CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(48.dp))
             }
 
+            // --- Tombol Logout ---
             OutlinedButton(
                 onClick = {
+                    // Minta ViewModel untuk menghapus data token & sesi
                     viewModel.logout()
                     onLogoutSuccess()
                 },

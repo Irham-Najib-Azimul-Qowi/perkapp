@@ -7,6 +7,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import android.Manifest
 
+/**
+ * RequestStoragePermission — Komponen (efek samping) untuk meminta izin akses ke penyimpanan HP.
+ *
+ * Menyesuaikan izin yang diminta berdasarkan versi Android (Android 13+ minta izin foto spesifik,
+ * di bawahnya minta izin penyimpanan eksternal biasa).
+ *
+ * @param onGranted Fungsi yang dijalankan jika pengguna memberikan izin (Allow).
+ * @param onDenied Fungsi yang dijalankan jika pengguna menolak izin (Deny).
+ */
 @Composable
 fun RequestStoragePermission(
     onGranted: () -> Unit,

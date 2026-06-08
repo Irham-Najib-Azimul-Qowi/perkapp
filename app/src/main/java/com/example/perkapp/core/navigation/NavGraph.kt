@@ -32,12 +32,19 @@ import com.example.perkapp.features.kegiatan.data.FakeKegiatanRepository
 import com.example.perkapp.features.kegiatan.ui.HomeScreen
 import com.example.perkapp.features.kegiatan.ui.HomeViewModel
 
+/**
+ * SetupNavGraph — Peta Jalan Aplikasi.
+ *
+ * Mengatur layar apa yang harus ditampilkan berdasarkan rute saat ini.
+ * Juga bertugas menyuntikkan (inject) ViewModel ke masing-masing layar.
+ */
 @Composable
 fun SetupNavGraph(
     navController: NavHostController,
     paddingValues: PaddingValues = PaddingValues()
 ) {
     // Inisialisasi AlatViewModel dengan scope Activity agar dapat di-share antar layar sub-fitur Alat
+    // Hal ini memastikan data alat yang baru ditambahkan langsung muncul di layar daftar tanpa harus muat ulang
     val context = LocalContext.current.applicationContext as android.app.Application
     val database = AppDatabase.getDatabase(context)
     val alatDao = database.alatDao()
@@ -49,18 +56,19 @@ fun SetupNavGraph(
         factory = alatViewModelFactory
     )
 
+    // NavHost adalah kontainer utama yang menampung semua layar
     NavHost(
         navController = navController,
-        startDestination = Screen.Splash.route,
+        startDestination = Screen.Splash.route, // Layar pertama kali dibuka adalah SplashScreen
         modifier = Modifier.padding(paddingValues)
     ) {
 
-        // --- BAGIAN ADAM (AUTH) ---
+        // --- BAGIAN ADAM (FITUR AUTENTIKASI) ---
         composable(route = Screen.Splash.route) {
             SplashScreen(
                 onNavigateToHome = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Splash.route) { inclusive = true }
+                        popUpTo(Screen.Splash.route) { inclusive = true } // Hapus splash dari history agar tak bisa di-back
                     }
                 },
                 onNavigateToLogin = {
@@ -92,7 +100,7 @@ fun SetupNavGraph(
                     }
                 },
                 onNavigateToLogin = {
-                    navController.popBackStack()
+                    navController.popBackStack() // Kembali ke layar sebelumnya (Login)
                 }
             )
         }
@@ -101,7 +109,7 @@ fun SetupNavGraph(
             ProfileScreen(
                 onLogoutSuccess = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(0) // Bersihkan semua backstack
+                        popUpTo(0) // Bersihkan semua backstack (Riwayat halaman) setelah Logout
                     }
                 },
                 onNavigateToInventaris = {
@@ -110,7 +118,7 @@ fun SetupNavGraph(
             )
         }
 
-        // --- BAGIAN REJA (KEGIATAN) ---
+        // --- BAGIAN REJA (FITUR KEGIATAN & HOME) ---
         composable(route = Screen.Home.route) {
             val repository = remember { FakeKegiatanRepository(context) }
             val homeViewModel: HomeViewModel = viewModel(
@@ -150,6 +158,7 @@ fun SetupNavGraph(
             )
         }
 
+        // Rute ini menerima argumen dinamis berupa 'id' kegiatan
         composable(
             route = Screen.DetailKegiatan.route,
             arguments = listOf(
@@ -189,7 +198,7 @@ fun SetupNavGraph(
             )
         }
 
-        // --- BAGIAN NAJIB (ALAT / INVENTARIS) ---
+        // --- BAGIAN NAJIB (FITUR ALAT / INVENTARIS) ---
         composable(route = Screen.Inventaris.route) {
             InventarisScreen(
                 viewModel = alatViewModel,

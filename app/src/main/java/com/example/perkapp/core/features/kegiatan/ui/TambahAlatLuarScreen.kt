@@ -28,6 +28,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 
+/**
+ * TambahAlatLuarScreen — Layar untuk menambahkan perlengkapan dari luar inventaris sistem.
+ *
+ * Pengguna bisa mengetikkan nama alat, identitas peminjaman, serta melampirkan foto alat
+ * (bisa diambil dari kamera langsung atau galeri). Alat ini nantinya tidak mengurangi
+ * stok inventaris utama aplikasi, melainkan dicatat terpisah.
+ *
+ * @param navController Controller navigasi Jetpack Compose
+ * @param onBack Aksi saat pengguna ingin kembali ke layar sebelumnya
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TambahAlatLuarScreen(

@@ -21,17 +21,30 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 
+/**
+ * ImageUtils — Alat bantu serba bisa untuk urusan Gambar (Foto).
+ *
+ * Berisi fungsi-fungsi kompleks untuk:
+ * 1. Mengubah file gambar lokal menjadi Bitmap (bisa ditampilkan di UI)
+ * 2. Mengunduh gambar dari server secara manual jika library gagal
+ * 3. Menyimpan gambar kamera secara permanen agar tidak hilang
+ */
 object ImageUtils {
 
+    /**
+     * Memuat gambar yang tersimpan secara lokal di HP (via alamat URI lokal).
+     */
     fun loadBitmapFromUri(context: Context, uriString: String?): Bitmap? {
         if (uriString.isNullOrBlank()) return null
         android.util.Log.d("ImageUtils", "loadBitmapFromUri: uriString = $uriString")
         return try {
             val uri = Uri.parse(uriString)
             android.util.Log.d("ImageUtils", "loadBitmapFromUri: parsed uri = $uri, scheme = ${uri.scheme}")
+            // Jika formatnya 'file://', baca langsung filenya
             val bitmap = if (uri.scheme == "file") {
                 BitmapFactory.decodeFile(uri.path)
             } else {
+                // Jika formatnya 'content://' (standar Android terbaru), gunakan MediaStore / ImageDecoder
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 } else {
@@ -49,7 +62,12 @@ object ImageUtils {
         }
     }
 
+    /**
+     * Memuat gambar langsung dari internet (URL) menggunakan OkHttp.
+     * Jika gagal (misal karena offline), otomatis mencari salinan lokalnya di database.
+     */
     private fun loadBitmapFromNetwork(context: Context, urlString: String): Bitmap? {
+        // Otomatis memperbaiki URL jika server lokal (localhost) namun diakses via HP fisik
         val correctedUrl = if (urlString.contains("localhost") || urlString.contains("127.0.0.1") || urlString.contains("10.0.2.2")) {
             urlString.replace(Regex("^https?://[^/]+"), "https://cakramanggalapnm.com")
         } else {
@@ -69,15 +87,21 @@ object ImageUtils {
                     }
                 } else {
                     android.util.Log.w("ImageUtils", "loadBitmapFromNetwork: failed, trying local fallback...")
+                    // Gagal ambil dari internet (error 404/500 dll), cari fotonya di HP
                     loadFallbackLocalImage(context, correctedUrl, urlString)
                 }
             }
         } catch (e: Exception) {
+            // Internet mati, langsung cari file offline-nya
             android.util.Log.e("ImageUtils", "loadBitmapFromNetwork: error loading $correctedUrl, trying local fallback...", e)
             loadFallbackLocalImage(context, correctedUrl, urlString)
         }
     }
 
+    /**
+     * Mencari apakah gambar yang gagal diunduh dari internet punya salinan fisik 
+     * di folder lokal (berdasarkan catatan tabel ImageEntity di Room).
+     */
     private fun loadFallbackLocalImage(context: Context, urlString: String, originalUrl: String? = null): Bitmap? {
         return try {
             val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
@@ -104,7 +128,8 @@ object ImageUtils {
     }
 
     /**
-     * Memuat bitmap baik dari URL online (network) maupun URI lokal.
+     * Fungsi utama untuk menampilkan gambar.
+     * Otomatis mendeteksi apakah path-nya berupa alamat Web atau alamat Lokal.
      */
     fun loadBitmap(context: Context, path: String?): Bitmap? {
         android.util.Log.d("ImageUtils", "loadBitmap: path = $path")
@@ -121,20 +146,22 @@ object ImageUtils {
     }
 
     /**
-     * Simpan bitmap ke file internal app dan kembalikan URI string-nya.
-     * File disimpan di filesDir (bukan cacheDir) agar tidak terhapus otomatis.
+     * Simpan objek gambar (Bitmap) menjadi file fisik (.jpg) di memori internal aplikasi.
+     * Gambar ini dikunci dan aman (tidak mudah terhapus cache-cleaner).
+     * 
+     * Berguna saat memfoto via aplikasi, lalu menyimpannya untuk di-upload belakangan.
      */
     fun saveBitmapToFile(context: Context, bitmap: Bitmap): String? {
         return try {
             val filename = "img_${UUID.randomUUID()}.jpg"
-            // Gunakan filesDir agar gambar persisten (tidak dihapus oleh sistem)
+            // Gunakan filesDir agar gambar persisten (tidak dihapus oleh sistem secara otomatis)
             val imageDir = File(context.filesDir, "images")
-            if (!imageDir.exists()) imageDir.mkdirs()
+            if (!imageDir.exists()) imageDir.mkdirs() // Buat foldernya jika belum ada
             val file = File(imageDir, filename)
             FileOutputStream(file).use { output ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)
             }
-            Uri.fromFile(file).toString()
+            Uri.fromFile(file).toString() // Kembalikan alamat 'file://...'
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -142,8 +169,9 @@ object ImageUtils {
     }
 
     /**
-     * Dapatkan File object dari URI string.
-     * Berguna untuk upload gambar ke server.
+     * Menyiapkan File fisik dari sebuah alamat URI (misal foto dari galeri).
+     * Jika asalnya dari galeri (content://), kita salin/copy dulu ke folder 
+     * aplikasi agar server Retrofit bisa mengunggahnya tanpa masalah izin akses.
      */
     fun getFileFromUri(context: Context, uriString: String): File? {
         return try {
@@ -151,7 +179,7 @@ object ImageUtils {
             if (uri.scheme == "file") {
                 File(uri.path!!)
             } else {
-                // Content URI - copy ke file lokal
+                // Content URI (dari Galeri Android) -> Copy ke direktori lokal aplikasi
                 val filename = "upload_${UUID.randomUUID()}.jpg"
                 val imageDir = File(context.filesDir, "images")
                 if (!imageDir.exists()) imageDir.mkdirs()
@@ -171,15 +199,21 @@ object ImageUtils {
 }
 
 /**
- * Helper composable untuk memuat gambar secara asinkron dari URL online maupun file lokal.
+ * Ingatan Visual (Remember Async Image) — Komponen UI bantu untuk Compose.
+ *
+ * Mengambil gambar secara asinkron di latar belakang (tanpa bikin layar macet),
+ * lalu menampilkannya begitu fotonya siap.
  */
 @Composable
 fun rememberAsyncImage(path: String?): Bitmap? {
     val context = androidx.compose.ui.platform.LocalContext.current
+    // Simpan status gambar, awalnya null (kosong)
     var bitmap by remember(path) { mutableStateOf<Bitmap?>(null) }
+    
+    // Efek Samping: Tiap kali 'path' foto berubah, lakukan pengunduhan ulang
     LaunchedEffect(path) {
         if (!path.isNullOrBlank()) {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) { // Pindahkan beban kerja ke thread pekerja (IO)
                 bitmap = ImageUtils.loadBitmap(context, path)
             }
         } else {

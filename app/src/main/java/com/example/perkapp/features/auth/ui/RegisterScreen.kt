@@ -15,6 +15,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.perkapp.core.Injection
 import com.example.perkapp.features.auth.api.RegisterRequest
 
+/**
+ * RegisterScreen — Halaman untuk membuat akun baru.
+ *
+ * Strukturnya sangat mirip dengan LoginScreen, bedanya di sini butuh tambahan
+ * nama/username untuk proses pendaftaran.
+ */
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
@@ -24,14 +30,17 @@ fun RegisterScreen(
     )
 ) {
     val context = LocalContext.current
+    // Mengamati status pendaftaran
     val registerState by viewModel.registerState.collectAsState()
 
+    // Variabel penampung teks dari kolom input
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    
     val isLoading = registerState is AuthState.Loading
 
-    // Menangani state success
+    // Jika berhasil register, kembali ke halaman login
     LaunchedEffect(registerState) {
         if (registerState is AuthState.Success) {
             onRegisterSuccess()
@@ -71,6 +80,7 @@ fun RegisterScreen(
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
+            // Menampilkan pesan error pendaftaran jika ada
             if (registerState is AuthState.Error) {
                 Text(
                     text = (registerState as AuthState.Error).message,
@@ -80,6 +90,7 @@ fun RegisterScreen(
                 )
             }
 
+            // Kolom Username
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -92,6 +103,7 @@ fun RegisterScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Kolom Email
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -104,6 +116,7 @@ fun RegisterScreen(
             
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Kolom Password
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -117,6 +130,7 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // Tombol Daftar
             Button(
                 onClick = {
                     viewModel.register(RegisterRequest(name = name, email = email, password = password))

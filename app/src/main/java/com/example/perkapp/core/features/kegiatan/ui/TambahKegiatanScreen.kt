@@ -41,6 +41,16 @@ import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 import java.util.Calendar
 import androidx.hilt.navigation.compose.hiltViewModel
 
+/**
+ * TambahKegiatanScreen — Halaman form (wizard 2 tahap) untuk mencatat kegiatan baru.
+ *
+ * Tahap 1: Pengisian info umum kegiatan (nama, tanggal pinjam/kembali, lokasi, deskripsi, peminjam).
+ * Tahap 2: Pemilihan alat dari inventaris dan/atau alat tambahan dari luar.
+ *
+ * @param navController Navigasi utama
+ * @param viewModel ViewModel alat
+ * @param kegiatanViewModel ViewModel kegiatan (aktivitas)
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TambahKegiatanScreen(
@@ -641,6 +651,15 @@ fun TambahKegiatanScreen(
     }
 }
 
+/**
+ * ToolSelectionCard — Komponen UI berupa kartu alat untuk halaman Tambah Kegiatan (Tahap 2).
+ *
+ * Digunakan untuk memilih jumlah alat (kuantitas) yang ingin dipinjam.
+ *
+ * @param alat Data alat yang tersedia di inventaris
+ * @param qtySelected Jumlah yang sedang dipilih pengguna
+ * @param onQtyChange Callback ketika pengguna menambah atau mengurangi jumlah pinjaman
+ */
 @Composable
 fun ToolSelectionCard(
     alat: AlatEntity,

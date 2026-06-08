@@ -10,72 +10,105 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.util.UUID
 
+/**
+ * MediaRepository — Sumber data khusus untuk pengelolaan media (terutama gambar).
+ *
+ * Repository ini menangani penyimpanan gambar ke database lokal (mode offline)
+ * serta proses upload gambar fisik (Multipart) ke server (mode online).
+ */
 class MediaRepository(
+    // Layanan API untuk upload gambar ke server
     private val api: MediaApiService,
+    // Akses ke tabel 'images' di database lokal
     private val dao: ImageDao,
     private val context: Context
 ) {
+    /**
+     * Mengambil daftar semua gambar yang terkait dengan satu alat spesifik.
+     */
     suspend fun getImagesForAlat(alatId: String): List<ImageEntity> {
         return dao.getImagesForEntity("alat", alatId)
     }
 
     /**
-     * Simpan gambar secara lokal (offline).
-     * Gambar akan disimpan dengan status "pending" dan di-sync nanti.
+     * Menyimpan referensi gambar secara lokal (offline) ke dalam tabel SQLite.
+     * Gambar ini akan ditandai dengan status "pending", yang artinya 
+     * aplikasinya harus mengunggah (upload) gambar ini ke server nanti saat ada internet.
+     *
+     * @param entityType Jenis entitas (misal: "alat", "kegiatan", "user")
+     * @param entityId ID dari entitas pemilik gambar tersebut
+     * @param localPath Path/lokasi file fisik gambar di penyimpanan HP
      */
     suspend fun saveImageLocally(entityType: String, entityId: String, localPath: String) {
         val entity = ImageEntity(
             id = UUID.randomUUID().toString(),
             entity_type = entityType,
             entity_id = entityId,
-            image_url = "",
+            image_url = "", // Belum ada URL karena belum di-upload
             local_path = localPath,
-            sync_status = "pending"
+            sync_status = "pending" // Menunggu untuk di-upload
         )
         dao.insertImage(entity)
     }
 
     /**
-     * Upload gambar ke server.
-     * Return true jika berhasil.
+     * Mencoba mengunggah gambar fisik ke server.
+     *
+     * Jika gagal (misal tidak ada internet atau server error), gambar tidak akan hilang,
+     * melainkan tetap tersimpan di database lokal dengan status "pending" agar
+     * bisa dicoba upload kembali di lain waktu.
+     *
+     * @return true jika berhasil terupload ke server, false jika gagal/offline
      */
     suspend fun uploadImage(entityType: String, entityId: String, file: File): Boolean {
         return try {
+            // Membungkus file fisik ke dalam format RequestBody untuk upload multipart
             val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
             val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
+            
+            // Data tambahan yang dikirim bersama gambar (tipe dan ID pemilik gambar)
             val typeBody = entityType.toRequestBody("text/plain".toMediaTypeOrNull())
             val idBody = entityId.toRequestBody("text/plain".toMediaTypeOrNull())
+            
             val response = api.uploadImage(body, typeBody, idBody)
             if (response.isSuccessful) {
+                // Server membalas dengan link URL gambar yang baru saja di-upload
                 response.body()?.data?.let { result ->
                     val entity = ImageEntity(
                         id = UUID.randomUUID().toString(),
                         entity_type = entityType,
                         entity_id = entityId,
-                        image_url = result.image_url,
+                        image_url = result.image_url, // Simpan URL dari server
                         local_path = file.absolutePath,
-                        sync_status = "synced"
+                        sync_status = "synced" // Tandai bahwa gambar ini sudah aman di server
                     )
                     dao.insertImage(entity)
                 }
                 true
             } else {
-                // Gagal upload, simpan lokal dengan status pending
+                // Gagal upload dari sisi server (misal: format tidak didukung), simpan lokal dulu (pending)
                 saveImageLocally(entityType, entityId, file.absolutePath)
                 false
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            // Error (misal: tidak ada internet), simpan lokal
+            // Error teknis (misal: koneksi terputus tiba-tiba), simpan lokal
             saveImageLocally(entityType, entityId, file.absolutePath)
             false
         }
     }
 
+    /**
+     * Fungsi internal untuk mencoba mengirim ulang satu gambar yang masih berstatus pending.
+     * Digunakan secara massal oleh proses SyncWorker.
+     */
     private suspend fun tryUploadImage(image: ImageEntity): Boolean {
         if (image.local_path.isBlank()) return false
+        
+        // Membaca file dari path lokal (URI/File path)
         val file = com.example.perkapp.core.utils.ImageUtils.getFileFromUri(context, image.local_path)
             ?: return false
+            
         if (!file.exists()) return false
 
         return try {
@@ -83,9 +116,12 @@ class MediaRepository(
             val body = MultipartBody.Part.createFormData("image", file.name, requestFile)
             val typeBody = image.entity_type.toRequestBody("text/plain".toMediaTypeOrNull())
             val idBody = image.entity_id.toRequestBody("text/plain".toMediaTypeOrNull())
+            
             val response = api.uploadImage(body, typeBody, idBody)
             if (response.isSuccessful) {
                 response.body()?.data?.let { result ->
+                    // Jika sukses, perbarui status gambar di database lokal menjadi "synced"
+                    // dan simpan URL aslinya
                     dao.updateImage(
                         image.copy(
                             image_url = result.image_url,
@@ -93,7 +129,7 @@ class MediaRepository(
                         )
                     )
 
-                    // Jika tipe entitas adalah 'alat', perbarui juga image_path di tabel 'alat'
+                    // Jika gambar ini milik sebuah alat, perbarui juga path gambar di tabel utama 'alat'
                     if (image.entity_type == "alat") {
                         val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
                         val alatDao = db.alatDao()
@@ -114,13 +150,18 @@ class MediaRepository(
     }
 
     /**
-     * Sync semua gambar pending ke server.
-     * Dipanggil oleh SyncWorker saat ada koneksi internet.
+     * Mensinkronisasi semua gambar yang belum terkirim ("pending") ke server.
+     * Biasanya fungsi ini dipanggil di belakang layar oleh SyncWorker setiap kali
+     * aplikasi mendeteksi ada koneksi internet.
+     *
+     * @return true jika SEMUA gambar berhasil di-upload, false jika ada satu/lebih yang gagal
      */
     suspend fun syncPendingImages(): Boolean {
+        // Ambil semua entri gambar di database yang berstatus "pending"
         val pendingImages = dao.getPendingImages()
         var allSuccess = true
 
+        // Coba upload satu per satu
         for (image in pendingImages) {
             if (!tryUploadImage(image)) {
                 allSuccess = false

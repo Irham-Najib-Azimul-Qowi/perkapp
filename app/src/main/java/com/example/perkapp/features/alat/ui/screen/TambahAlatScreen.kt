@@ -57,6 +57,12 @@ import androidx.compose.ui.unit.dp
 import com.example.perkapp.core.utils.ImageUtils
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
+/**
+ * TambahAlatScreen — Halaman form untuk memasukkan barang baru ke inventaris.
+ *
+ * Mendukung input data dasar (nama, kategori, jumlah, kondisi) serta
+ * pengambilan foto barang langsung dari kamera atau galeri HP.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TambahAlatScreen(
@@ -66,34 +72,40 @@ fun TambahAlatScreen(
     val context = LocalContext.current
     val isLoading by viewModel.isLoading.observeAsState(false)
 
+    // Menyimpan state dari setiap inputan form
     var nama by remember { mutableStateOf("") }
     var kategori by remember { mutableStateOf("") }
     var jumlah by remember { mutableStateOf("") }
     var kondisi by remember { mutableStateOf("good") }
-    var expandedKondisi by remember { mutableStateOf(false) }
+    var expandedKondisi by remember { mutableStateOf(false) } // Untuk membuka tutup dropdown
+    
+    // Menyimpan URI (alamat) foto dan bitmap untuk ditampilkan di layar
     var imageUriString by remember { mutableStateOf<String?>(null) }
     var bitmapPreview by remember { mutableStateOf<Bitmap?>(null) }
 
+    // Membuka Galeri Foto
     val gallerylauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let {
-            // Copy gambar dari content URI ke penyimpanan internal app
-            // agar tetap bisa diakses secara offline
+            // Copy gambar dari galeri ke memori internal app agar aman walau offline
             val file = ImageUtils.getFileFromUri(context, it.toString())
             if (file != null) {
                 imageUriString = android.net.Uri.fromFile(file).toString()
             } else {
                 imageUriString = it.toString()
             }
+            // Muat gambar untuk ditampilkan di preview
             bitmapPreview = ImageUtils.loadBitmapFromUri(context, imageUriString)
         }
     }
 
+    // Membuka Kamera Android
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         bitmap?.let {
+            // Simpan hasil jepretan kamera ke file fisik di HP
             val savedUriString = ImageUtils.saveBitmapToFile(context, it)
             if (savedUriString != null) {
                 imageUriString = savedUriString
@@ -104,7 +116,7 @@ fun TambahAlatScreen(
 
     val kondisiOptions = listOf("good", "damaged")
 
-    // Warna kustom untuk OutlinedTextField
+    // Pewarnaan kustom untuk semua kotak input agar seragam
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -143,9 +155,10 @@ fun TambahAlatScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .padding(16.dp)
+                // Agar form bisa di-scroll jika layar kekecilan
                 .verticalScroll(rememberScrollState())
         ) {
-            // Form fields dengan styling baru
+            // --- Input Nama Alat ---
             OutlinedTextField(
                 value = nama,
                 onValueChange = { nama = it },
@@ -157,6 +170,7 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // --- Input Kategori ---
             OutlinedTextField(
                 value = kategori,
                 onValueChange = { kategori = it },
@@ -168,6 +182,7 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // --- Input Jumlah ---
             OutlinedTextField(
                 value = jumlah,
                 onValueChange = { jumlah = it },
@@ -179,7 +194,7 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Dropdown Kondisi
+            // --- Dropdown Pilihan Kondisi ---
             ExposedDropdownMenuBox(
                 expanded = expandedKondisi,
                 onExpandedChange = { expandedKondisi = !expandedKondisi }
@@ -187,7 +202,7 @@ fun TambahAlatScreen(
                 OutlinedTextField(
                     value = kondisi.replaceFirstChar { it.uppercase() },
                     onValueChange = {},
-                    readOnly = true,
+                    readOnly = true, // Supaya user tidak ngetik manual, harus pilih dari list
                     label = { Text("Kondisi") },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedKondisi)
@@ -205,7 +220,7 @@ fun TambahAlatScreen(
                             text = { Text(option.replaceFirstChar { it.uppercase() }) },
                             onClick = {
                                 kondisi = option
-                                expandedKondisi = false
+                                expandedKondisi = false // Tutup menu setelah dipilih
                             }
                         )
                     }
@@ -214,7 +229,7 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Section Gambar
+            // --- Bagian Gambar Alat ---
             Text(
                 text = "Gambar Alat",
                 style = MaterialTheme.typography.titleSmall,
@@ -228,7 +243,7 @@ fun TambahAlatScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Tombol Kamera (Outlined style)
+                // Tombol Buka Kamera
                 OutlinedButton(
                     onClick = { cameraLauncher.launch() },
                     modifier = Modifier.weight(1f).height(48.dp),
@@ -244,7 +259,7 @@ fun TambahAlatScreen(
                     Text("Kamera")
                 }
 
-                // Tombol Galeri (Outlined style)
+                // Tombol Buka Galeri
                 OutlinedButton(
                     onClick = { gallerylauncher.launch("image/*") },
                     modifier = Modifier.weight(1f).height(48.dp),
@@ -263,7 +278,7 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Preview Gambar
+            // Tampilkan foto yang berhasil diambil (Preview)
             bitmapPreview?.let {
                 Box(
                     modifier = Modifier
@@ -275,7 +290,7 @@ fun TambahAlatScreen(
                     Image(
                         bitmap = it.asImageBitmap(),
                         contentDescription = "Preview Gambar",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Crop, // Potong gambar biar pas di kotak
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
@@ -286,9 +301,10 @@ fun TambahAlatScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Tombol Simpan (Primary style)
+            // --- Tombol Simpan ---
             Button(
                 onClick = {
+                    // Validasi Dasar agar data tidak bodong
                     if (nama.isBlank()) {
                         android.widget.Toast.makeText(context, "Nama Alat tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
                         return@Button
@@ -303,8 +319,9 @@ fun TambahAlatScreen(
                         return@Button
                     }
                     
+                    // Kirim ke ViewModel untuk di-insert ke Room Database
                     viewModel.createAlat(nama, kategori, qty, kondisi, imageUriString ?: "")
-                    onBack()
+                    onBack() // Kembali ke halaman sebelumnya
                 },
                 enabled = !isLoading,
                 modifier = Modifier

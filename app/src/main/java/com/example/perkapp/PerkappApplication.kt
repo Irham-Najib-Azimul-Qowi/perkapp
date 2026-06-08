@@ -6,20 +6,28 @@ import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 
 /**
- * Kelas PerkappApplication adalah kelas utama Aplikasi.
- * Anotasi @HiltAndroidApp menandakan bahwa kelas ini memicu pembuatan kode oleh Hilt,
- * termasuk kelas dasar untuk aplikasi yang berfungsi sebagai kontainer dependensi tingkat atas.
+ * PerkappApplication — Titik awal (Entry Point) berjalannya aplikasi.
+ *
+ * Kelas ini adalah yang pertama kali dijalankan oleh sistem Android bahkan
+ * sebelum Activity/Layar pertama muncul.
+ *
+ * Anotasi @HiltAndroidApp menandakan bahwa kita menggunakan Hilt 
+ * (Dependency Injection) di proyek ini. Hilt akan membangun pondasi di sini 
+ * agar komponen seperti ViewModel bisa dibuat secara otomatis.
  */
 @HiltAndroidApp
 class PerkappApplication : Application() {
     
     companion object {
+        // Menyimpan instance global dari aplikasi agar bisa diakses dari mana saja
+        // tanpa harus mengirim Context terus-menerus (misal di dalam RetrofitClient).
         lateinit var instance: PerkappApplication
             private set
     }
 
     override fun onCreate() {
         super.onCreate()
+        // Menyimpan referensi aplikasi ke dalam instance saat aplikasi pertama kali dibuka
         instance = this
     }
 }

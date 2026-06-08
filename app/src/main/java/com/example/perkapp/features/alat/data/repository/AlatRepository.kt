@@ -10,32 +10,59 @@ import java.util.UUID
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * AlatRepository — Sumber data tunggal untuk fitur inventaris alat.
+ *
+ * Repository ini adalah "perantara" antara ViewModel dan sumber data.
+ * Tugasnya: mengelola penggabungan data dari API server (online) 
+ * dengan Room Database (offline). 
+ *
+ * Dengan pendekatan ini, aplikasi tetap bisa membaca, menambah, mengubah,
+ * dan menghapus data alat meskipun HP sedang tidak ada sinyal (offline-first).
+ */
 class AlatRepository(
+    // api: layanan HTTP untuk berkomunikasi dengan server
     private val api: AlatApiService,
+    // dao: akses ke tabel alat di database lokal SQLite (Room)
     private val dao: AlatDao,
+    // context: diperlukan untuk mengecek status jaringan atau akses database tambahan
     private val context: Context
 ) {
     companion object {
+        // Mutex bertindak sebagai "gembok" untuk mencegah proses sinkronisasi ganda.
+        // Jika ada proses sync yang sedang berjalan, proses lain harus menunggu sampai selesai,
+        // mencegah data bentrok atau terkirim dua kali ke server.
         private val syncMutex = Mutex()
     }
+
     /**
-     * Ambil semua alat.
-     * - Jika online: fetch dari API, simpan ke local, lalu kembalikan dari local
-     * - Jika offline: langsung kembalikan dari local database
+     * Mengambil semua daftar alat.
+     *
+     * Cara kerja:
+     * 1. Jika online: minta data terbaru dari server, simpan/perbarui database lokal, 
+     *    kecuali data yang masih berstatus "pending" (punya perubahan lokal).
+     * 2. Jika offline: langsung melewati proses API.
+     * 3. Selalu mengembalikan daftar alat dari database lokal (single source of truth).
+     *
+     * @return List berisi AlatEntity dari database lokal.
      */
     suspend fun getAllAlat(): List<AlatEntity> {
+        // Mengecek apakah perangkat sedang terhubung ke internet
         if (NetworkUtils.isOnline(context)) {
             try {
+                // Request data terbaru dari server
                 val response = api.getAllAlat()
                 if (response.isSuccessful) {
                     response.body()?.data?.let { alatList ->
-                        // Ambil data pending lokal sebelum replace
+                        // Ambil data lokal yang masih punya perubahan tertunda (pending)
                         val pendingItems = dao.getPendingAlat()
+                        // Simpan ID alat yang sedang pending
                         val pendingIds = pendingItems.map { it.id }.toSet()
 
                         val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
                         val imageDao = db.imageDao()
 
+                        // Mengonversi data dari server menjadi format database lokal
                         val entities = alatList.map { item ->
                             val existing = dao.getAlatById(item.id)
                             var imagePath = existing?.image_path
@@ -57,12 +84,14 @@ class AlatRepository(
                                 total_qty = item.total_qty,
                                 available_qty = item.available_qty,
                                 condition = item.condition,
-                                sync_status = "synced",
+                                sync_status = "synced", // Tandai data ini sudah sama persis dengan server
                                 image_path = imagePath,
                                 pending_action = null
                             )
                         }
-                        // Insert data dari server (tapi jangan timpa data pending lokal)
+                        
+                        // Insert/update data dari server HANYA JIKA data tersebut tidak sedang
+                        // dimodifikasi secara lokal (pendingIds). Ini menjaga perubahan lokal tidak tertimpa.
                         entities.filter { it.id !in pendingIds }.forEach { entity ->
                             dao.insertAlat(entity)
                         }
@@ -73,7 +102,8 @@ class AlatRepository(
             }
         }
 
-        // AUTO-REPAIR BLOCK: Reconstruct any NULL image_path from the images table
+        // AUTO-REPAIR BLOCK: Memperbaiki masalah data gambar jika image_path kosong
+        // tapi di tabel image ternyata tersimpan gambarnya.
         try {
             val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
             val imageDao = db.imageDao()
@@ -85,7 +115,7 @@ class AlatRepository(
                         val path = images.first().image_url ?: images.first().local_path
                         if (!path.isNullOrBlank()) {
                             val updated = alat.copy(image_path = path)
-                            dao.insertAlat(updated)
+                            dao.insertAlat(updated) // Simpan perbaikan path gambar
                         }
                     }
                 }
@@ -94,16 +124,21 @@ class AlatRepository(
             e.printStackTrace()
         }
 
+        // Selalu kembalikan data yang ada di tabel SQLite lokal (baik offline maupun online)
         return dao.getAllAlat()
     }
 
     /**
-     * Buat alat baru.
-     * - Simpan ke local database dulu (pending)
-     * - Jika online: langsung sync ke API
-     * - Jika offline: tetap tersimpan lokal, nanti di-sync oleh SyncWorker
+     * Menyimpan alat baru.
+     *
+     * Cara kerja:
+     * - Menyimpan data ke database lokal terlebih dulu dengan status "pending create".
+     * - Menyimpan fotonya ke penyimpanan lokal.
+     * - Jika internet tersedia, mencoba langsung mengirimkannya ke server.
+     * - Jika tidak ada internet, operasi tetap sukses dan akan dikirim di lain waktu.
      */
     suspend fun createAlat(name: String, category: String, totalQty: Int, condition: String, imagePath: String?) {
+        // Karena belum dikirim ke server, buat ID lokal secara acak
         val localId = UUID.randomUUID().toString()
         val localEntity = AlatEntity(
             id = localId,
@@ -112,13 +147,14 @@ class AlatRepository(
             total_qty = totalQty,
             available_qty = totalQty,
             condition = condition,
-            sync_status = "pending",
+            sync_status = "pending", // Status pending karena belum tentu masuk ke server
             image_path = imagePath,
-            pending_action = "create"
+            pending_action = "create" // Aksi yang perlu dikerjakan nanti adalah 'create'
         )
+        // Simpan alat baru ke database lokal (offline-first)
         dao.insertAlat(localEntity)
 
-        // Simpan gambar secara lokal
+        // Simpan gambar secara lokal menggunakan MediaRepository
         if (!imagePath.isNullOrBlank()) {
             try {
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
@@ -131,6 +167,7 @@ class AlatRepository(
             }
         }
 
+        // Langsung coba kirim ke server jika saat ini sedang online
         if (NetworkUtils.isOnline(context)) {
             try {
                 syncPendingData()
@@ -141,10 +178,10 @@ class AlatRepository(
     }
 
     /**
-     * Update alat.
-     * - Update di local database dulu (pending)
-     * - Jika online: langsung sync ke API
-     * - Jika offline: data terupdate lokal, nanti di-sync oleh SyncWorker
+     * Memperbarui informasi alat yang sudah ada.
+     *
+     * Jika alat yang diupdate asalnya masih "pending create", statusnya tetap "create",
+     * tetapi nilainya diperbarui. Jika asalnya dari server, status diubah menjadi "pending update".
      */
     suspend fun updateAlat(alat: AlatEntity, request: CreateAlatRequest) {
         val updated = alat.copy(
@@ -152,14 +189,15 @@ class AlatRepository(
             category = request.category,
             total_qty = request.total_qty,
             condition = request.condition,
-            sync_status = "pending",
+            sync_status = "pending", // Menandakan butuh sinkronisasi
             image_path = request.image_path,
-            // Jika item belum pernah di-sync (masih create pending), tetap "create"
+            // Logika penting: Jika kita mengedit alat yang belum pernah sampai ke server (create),
+            // aksi sinkronisasinya tetap 'create'. Tapi jika alat dari server diedit, aksinya 'update'.
             pending_action = if (alat.pending_action == "create") "create" else "update"
         )
         dao.updateAlat(updated)
 
-        // Simpan gambar secara lokal jika baru
+        // Simpan referensi gambar ke lokal jika fotonya diganti dengan yang baru
         if (!request.image_path.isNullOrBlank() && request.image_path != alat.image_path) {
             try {
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
@@ -182,18 +220,22 @@ class AlatRepository(
     }
 
     /**
-     * Hapus alat.
-     * - Jika online: hapus dari API dan lokal
-     * - Jika offline: tandai sebagai pending delete (soft delete), nanti di-sync
+     * Menghapus alat.
+     *
+     * Menangani kondisi "soft delete": alih-alih menghapus data sepenuhnya,
+     * alat ditandai 'delete'. Ini memastikan aplikasi ingat untuk menghapus alat ini
+     * di server saat koneksi internet kembali.
      */
     suspend fun deleteAlat(id: String) {
         val existing = dao.getAlatById(id)
         if (existing != null) {
             if (existing.pending_action == "create") {
-                // Belum pernah di-sync, hapus langsung dari lokal
+                // Alat ini dibuat saat offline, dan dihapus saat offline juga.
+                // Server sama sekali tidak tahu, jadi kita bisa langsung menghapusnya di lokal dengan bersih.
                 dao.deleteAlat(id)
             } else {
-                // Tandai sebagai pending delete
+                // Alat ini sudah ada di server, jadi hanya ubah penanda (flag) di database lokal
+                // menjadi 'delete', sehingga nanti SyncWorker tahu alat ini harus dihapus dari server.
                 dao.updateAlat(
                     existing.copy(
                         sync_status = "pending",
@@ -212,23 +254,35 @@ class AlatRepository(
         }
     }
 
+    /**
+     * Mengambil satu data alat spesifik berdasarkan ID dari database lokal.
+     */
     suspend fun getAlatById(id: String): AlatEntity? {
         return dao.getAlatById(id)
     }
 
     /**
-     * Sync semua data pending ke server.
-     * Dipanggil oleh SyncWorker saat ada koneksi internet.
+     * Menjalankan seluruh proses sinkronisasi antrean tugas offline (pending_action).
+     *
+     * Berfungsi mirip "tukang pos" yang mengantarkan pesan tertunda saat jalan internet terbuka.
+     * Akan membaca tabel SQLite, mencari yang statusnya "pending", dan mengeksekusi
+     * create/update/delete ke API server satu per satu.
+     *
+     * @return true jika semua tugas sukses terkirim, false jika ada satu/lebih yang gagal
      */
     suspend fun syncPendingData(): Boolean {
+        // syncMutex.withLock memastikan bahwa fungsi ini tidak dijalankan bersamaan
+        // oleh beberapa coroutine (misal user klik-klik dan SyncWorker juga jalan bersamaan).
         return syncMutex.withLock {
-            val pendingItems = dao.getPendingAlat()
+            val pendingItems = dao.getPendingAlat() // Ambil antrean dari database lokal
             var allSuccess = true
 
             for (item in pendingItems) {
                 try {
+                    // Mengecek jenis aksi tertunda yang harus dijalankan
                     when (item.pending_action) {
                         "create" -> {
+                            // Mengirim request untuk menambahkan alat baru ke server
                             val request = CreateAlatRequest(
                                 name = item.name,
                                 category = item.category,
@@ -238,7 +292,9 @@ class AlatRepository(
                             val response = api.createAlat(request)
                             if (response.isSuccessful) {
                                 response.body()?.data?.let { apiAlat ->
+                                    // Berhasil! Hapus data alat dengan ID acak lokal
                                     dao.deleteAlat(item.id)
+                                    // Gantikan dengan alat yang punya ID resmi dari server (UUID dari backend)
                                     dao.insertAlat(
                                         AlatEntity(
                                             id = apiAlat.id,
@@ -247,13 +303,14 @@ class AlatRepository(
                                             total_qty = apiAlat.total_qty,
                                             available_qty = apiAlat.available_qty,
                                             condition = apiAlat.condition,
-                                            sync_status = "synced",
+                                            sync_status = "synced", // Status sekarang beres (synced)
                                             image_path = item.image_path,
                                             pending_action = null
                                         )
                                     )
 
-                                    // Update entityId gambar di Room dari localId ke server ID
+                                    // Mengupdate ID tabel gambar: gambar yang asalnya menunjuk ke ID lokal acak
+                                    // harus diubah agar menunjuk ke ID server yang baru
                                     try {
                                         val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
                                         val imageDao = db.imageDao()
@@ -268,10 +325,11 @@ class AlatRepository(
                                     }
                                 }
                             } else {
-                                allSuccess = false
+                                allSuccess = false // Gagal dari server, kita akan coba lagi lain kali
                             }
                         }
                         "update" -> {
+                            // Mengirim perubahan pada alat yang sudah ada
                             val request = CreateAlatRequest(
                                 name = item.name,
                                 category = item.category,
@@ -281,6 +339,7 @@ class AlatRepository(
                             )
                             val response = api.updateAlat(item.id, request)
                             if (response.isSuccessful) {
+                                // Sukses diperbarui, hilangkan status pending
                                 dao.updateAlat(
                                     item.copy(sync_status = "synced", pending_action = null)
                                 )
@@ -289,8 +348,10 @@ class AlatRepository(
                             }
                         }
                         "delete" -> {
+                            // Mengirim permintaan untuk benar-benar menghapus alat dari server
                             val response = api.deleteAlat(item.id)
                             if (response.isSuccessful) {
+                                // Server berhasil menghapus, jadi sekarang hapus juga dari database lokal selamanya
                                 dao.deleteAlat(item.id)
                             } else {
                                 allSuccess = false
@@ -299,11 +360,12 @@ class AlatRepository(
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    allSuccess = false
+                    allSuccess = false // Kalau jaringan tiba-tiba putus, tandai sebagai gagal
                 }
             }
             
             // Sync all pending images at the end of alat sync
+            // Mengantarkan antrean gambar-gambar alat ke server juga
             try {
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(context)
                 val mediaApi = com.example.perkapp.core.network.RetrofitClient.instance.create(com.example.perkapp.features.media.api.MediaApiService::class.java)

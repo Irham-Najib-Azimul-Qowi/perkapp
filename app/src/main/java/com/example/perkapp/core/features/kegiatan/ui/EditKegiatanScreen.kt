@@ -23,6 +23,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.Calendar
 
+/**
+ * EditKegiatanScreen — Halaman untuk mengubah (mengedit) data kegiatan yang sudah ada.
+ *
+ * Form otomatis terisi dengan data kegiatan sebelumnya (seperti judul, lokasi, dll).
+ * Pengguna dapat mengubah info tersebut dan menyimpannya ke sistem.
+ *
+ * @param kegiatanId ID kegiatan yang akan diedit
+ * @param onBack Fungsi callback untuk kembali ke layar sebelumnya
+ * @param viewModel ViewModel aktivitas yang diinjeksi via Hilt
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditKegiatanScreen(

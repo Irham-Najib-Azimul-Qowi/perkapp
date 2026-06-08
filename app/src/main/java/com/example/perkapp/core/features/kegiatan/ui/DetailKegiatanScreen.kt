@@ -40,6 +40,19 @@ data class DetailToolState(
     val imagePath: String? = null
 )
 
+/**
+ * DetailKegiatanScreen — Halaman untuk melihat informasi lengkap suatu kegiatan.
+ *
+ * Di layar ini, pengguna bisa melihat rincian kegiatan seperti tanggal, peminjam,
+ * lokasi, dan daftar alat yang sedang dipakai. Terdapat juga fitur absensi pengembalian
+ * (menandai alat sudah dikembalikan), serta tombol Edit dan Hapus (jika memiliki hak akses).
+ *
+ * @param kegiatanId ID kegiatan yang sedang dilihat
+ * @param onBack Fungsi untuk kembali ke layar sebelumnya
+ * @param onEditClick Fungsi navigasi ke layar Edit Kegiatan
+ * @param onDeleteSuccess Callback saat kegiatan berhasil dihapus
+ * @param viewModel ViewModel aktivitas yang diinjeksi via Hilt
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailKegiatanScreen(
@@ -465,6 +478,12 @@ fun DetailKegiatanScreen(
     }
 }
 
+/**
+ * DetailKegiatanToolCard — Komponen visual (kartu) untuk satu item alat di halaman Detail Kegiatan.
+ *
+ * @param tool Data alat yang berisi nama, jumlah, dan status pengembalian
+ * @param onClick Aksi ketika kartu alat ditekan (misal: untuk proses absensi/pengembalian)
+ */
 @Composable
 fun DetailKegiatanToolCard(
     tool: DetailToolState,

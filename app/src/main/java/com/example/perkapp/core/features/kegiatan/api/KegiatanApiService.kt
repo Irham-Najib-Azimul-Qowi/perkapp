@@ -13,6 +13,7 @@ data class KegiatanResponse(
     val alats: List<AlatPivotResponse>? = null
 )
 
+// Pivot menunjukkan relasi Many-to-Many antara Kegiatan dan Alat
 data class AlatPivotResponse(
     val id: String,
     val name: String,
@@ -38,14 +39,14 @@ data class KegiatanWrapperResponse(
     val data: KegiatanResponse
 )
 
-// Response DTO untuk statistik inventori
+// Response DTO untuk statistik inventori (Dashboard)
 data class InventoryStatsResponse(
     val borrowed_count: Int,
     val available_count: Int,
     val pending_sync_count: Int
 )
 
-// Response wrapper dari API
+// Response wrapper dari API (Dashboard Beranda)
 data class HomeDataResponse(
     val stats: InventoryStatsResponse,
     val kegiatan_aktif: List<KegiatanResponse>
@@ -77,38 +78,47 @@ data class GeneralApiResponse(
     val message: String
 )
 
-// Interface endpoint API untuk fitur kegiatan
+/**
+ * KegiatanApiService — Rute API untuk fitur Peminjaman/Kegiatan.
+ */
 interface KegiatanApiService {
 
+    // Mengambil data rangkuman statistik untuk halaman depan (Home/Beranda)
     @GET("home/data")
     suspend fun getHomeData(): HomeDataResponse
 
+    // Mengambil seluruh riwayat acara/kegiatan yang ada
     @GET("kegiatan")
     suspend fun getSemuaKegiatan(
-        @Query("status") status: String? = null
+        @Query("status") status: String? = null // Bisa difilter misalnya: "?status=ongoing"
     ): KegiatanListWrapperResponse
 
+    // Mengambil rincian detail 1 kegiatan tertentu
     @GET("kegiatan/{id}")
     suspend fun getDetailKegiatan(
         @Path("id") id: String
     ): KegiatanWrapperResponse
 
+    // Membuat kegiatan baru
     @POST("kegiatan")
     suspend fun createKegiatan(
         @Body request: CreateKegiatanRequest
     ): KegiatanWrapperResponse
 
+    // Memperbarui informasi kegiatan (termasuk acc peminjaman)
     @PUT("kegiatan/{id}")
     suspend fun updateKegiatan(
         @Path("id") id: String,
         @Body request: UpdateKegiatanRequest
     ): KegiatanWrapperResponse
 
+    // Menghapus kegiatan
     @DELETE("kegiatan/{id}")
     suspend fun deleteKegiatan(
         @Path("id") id: String
     ): GeneralApiResponse
 
+    // Menyisipkan daftar pinjaman alat ke dalam sebuah kegiatan
     @POST("kegiatan-alat")
     suspend fun addToolToKegiatan(
         @Body request: AddToolToKegiatanRequest

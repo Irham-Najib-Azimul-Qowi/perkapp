@@ -16,6 +16,13 @@ import com.example.perkapp.core.datastore.UserPreferences
 import com.example.perkapp.core.datastore.dataStore
 import kotlinx.coroutines.delay
 
+/**
+ * SplashScreen — Layar pertama yang muncul saat aplikasi dibuka.
+ *
+ * Fungsinya bukan sekadar pajangan, tapi juga sebagai tempat "berpikir" aplikasi:
+ * "Apakah user ini sudah login sebelumnya atau belum?"
+ * Jika sudah, langsung lempar ke Home. Jika belum, lempar ke layar Login.
+ */
 @Composable
 fun SplashScreen(
     onNavigateToHome: () -> Unit,
@@ -23,25 +30,27 @@ fun SplashScreen(
 ) {
     val context = LocalContext.current
     val userPreferences = remember { UserPreferences(context.dataStore) }
-    // Gunakan initial state "LOADING" sebagai indikator kita masih mengecek datastore
+    // Gunakan initial state "LOADING" sebagai indikator kita masih mengecek datastore (sedang membaca memori HP)
     val token by userPreferences.getAuthToken.collectAsState(initial = "LOADING")
 
+    // LaunchedEffect akan berjalan satu kali saat layar ini dimunculkan
     LaunchedEffect(token) {
         // Jika token masih "LOADING", artinya kita belum selesai membaca DataStore. Kita tunggu.
         if (token != "LOADING") {
-            // Beri sedikit delay agar SplashScreen sempat terlihat oleh mata user
+            // Beri sedikit jeda (1.5 detik) agar animasi Splash atau logonya sempat terlihat oleh user
             delay(1500)
             
             if (token.isNullOrEmpty()) {
-                // Token tidak ada, user harus login
+                // Token kosong -> user belum login, arahkan ke halaman Login
                 onNavigateToLogin()
             } else {
-                // Token sudah ada, bypass login (langsung masuk home)
+                // Token ada -> user sudah pernah login dan sesinya belum habis, langsung masuk Home
                 onNavigateToHome()
             }
         }
     }
 
+    // Tampilan UI SplashScreen (Hanya menaruh teks 'perkapp' di tengah layar)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center

@@ -58,6 +58,13 @@ import com.example.perkapp.core.utils.ImageUtils
 import com.example.perkapp.features.alat.data.remote.CreateAlatRequest
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
+/**
+ * EditAlatScreen — Halaman form untuk mengubah detail barang.
+ *
+ * Persis seperti TambahAlatScreen, namun perbedaannya form ini 
+ * langsung terisi data-data lama dari barang tersebut sehingga 
+ * kita tidak perlu repot mengetik ulang.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditAlatScreen(
@@ -68,17 +75,22 @@ fun EditAlatScreen(
     val context = LocalContext.current
     val alat by viewModel.selectedAlat.observeAsState()
 
+    // Variabel state untuk field form
     var nama by remember { mutableStateOf("") }
     var kategori by remember { mutableStateOf("") }
     var jumlah by remember { mutableStateOf("") }
     var kondisi by remember { mutableStateOf("good") }
     var expandedKondisi by remember { mutableStateOf(false) }
+    
+    // Penanda apakah form sudah terisi data lama atau belum
     var isLoaded by remember { mutableStateOf(false) }
+    
     var imageUriString by remember { mutableStateOf<String?>(null) }
     var bitmapPreview by remember { mutableStateOf<Bitmap?>(null) }
 
     val kondisiOptions = listOf("good", "damaged")
 
+    // Launcher Galeri
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -93,6 +105,7 @@ fun EditAlatScreen(
         }
     }
 
+    // Launcher Kamera
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
@@ -105,10 +118,12 @@ fun EditAlatScreen(
         }
     }
 
+    // Ambil data alat dari database sesuai ID-nya
     LaunchedEffect(alatId) {
         viewModel.getAlatById(alatId)
     }
 
+    // Jika data alat ketemu dan form belum diisi, masukkan data lama ke form
     LaunchedEffect(alat) {
         if (!isLoaded && alat != null) {
             nama = alat!!.name
@@ -116,16 +131,18 @@ fun EditAlatScreen(
             jumlah = alat!!.total_qty.toString()
             kondisi = alat!!.condition
             imageUriString = alat!!.image_path
+            
+            // Mengambil dan me-render foto yang sudah ada (jika ada)
             if (!alat!!.image_path.isNullOrBlank()) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     bitmapPreview = ImageUtils.loadBitmap(context, alat!!.image_path)
                 }
             }
-            isLoaded = true
+            isLoaded = true // Form sudah siap
         }
     }
 
-    // Warna kustom untuk OutlinedTextField
+    // Pewarnaan kustom kolom text field
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -199,7 +216,7 @@ fun EditAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Dropdown Kondisi
+            // --- Dropdown Pilihan Kondisi ---
             ExposedDropdownMenuBox(
                 expanded = expandedKondisi,
                 onExpandedChange = { expandedKondisi = !expandedKondisi }
@@ -234,7 +251,7 @@ fun EditAlatScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Section Gambar
+            // --- Bagian Gambar Alat ---
             Text(
                 text = "Gambar Alat",
                 style = MaterialTheme.typography.titleSmall,
@@ -281,7 +298,7 @@ fun EditAlatScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Preview Gambar
+            // Menampilkan preview foto baru atau foto lama yang dipertahankan
             bitmapPreview?.let {
                 Box(
                     modifier = Modifier
@@ -304,16 +321,19 @@ fun EditAlatScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Tombol Simpan Perubahan
+            // --- Tombol Simpan Perubahan ---
             Button(
                 onClick = {
                     val qty = jumlah.toIntOrNull() ?: 0
+                    
+                    // Validasi Dasar
                     when {
                         nama.isBlank() -> android.widget.Toast.makeText(context, "Nama Alat tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
                         kategori.isBlank() -> android.widget.Toast.makeText(context, "Kategori tidak boleh kosong", android.widget.Toast.LENGTH_SHORT).show()
                         qty <= 0 -> android.widget.Toast.makeText(context, "Jumlah harus lebih dari 0", android.widget.Toast.LENGTH_SHORT).show()
                         alat == null -> android.widget.Toast.makeText(context, "Data alat tidak ditemukan", android.widget.Toast.LENGTH_SHORT).show()
                         else -> {
+                            // Bungkus data yang telah diedit dan kirim ke ViewModel
                             val request = CreateAlatRequest(
                                 name = nama,
                                 category = kategori,

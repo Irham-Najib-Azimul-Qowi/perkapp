@@ -56,6 +56,12 @@ import androidx.compose.ui.unit.dp
 import com.example.perkapp.core.utils.rememberAsyncImage
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
+/**
+ * DetailAlatScreen — Halaman untuk melihat rincian sebuah barang.
+ *
+ * Menampilkan foto besar, nama, kategori, jumlah total dan tersedia,
+ * serta tombol untuk mengedit atau menghapus barang tersebut.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailAlatScreen(
@@ -65,14 +71,18 @@ fun DetailAlatScreen(
     onEditClick: (String) -> Unit = {},
     onDeleteClick: (String) -> Unit = {}
 ) {
+    // Membaca data alat spesifik yang sedang kita minta
     val alat by viewModel.selectedAlat.observeAsState()
+    
+    // State untuk memunculkan atau menyembunyikan Pop-Up peringatan "Hapus"
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // Meminta ViewModel untuk menarik data alat dari Room berdasarkan ID-nya
     LaunchedEffect(alatId) {
         viewModel.getAlatById(alatId)
     }
 
-    // Dialog konfirmasi hapus
+    // --- Dialog Konfirmasi Hapus ---
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -123,10 +133,11 @@ fun DetailAlatScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
+        
+        // Memuat gambar secara asinkron di latar belakang
         val bitmap = rememberAsyncImage(alat?.image_path)
 
         alat?.let { data ->
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -134,7 +145,7 @@ fun DetailAlatScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Gambar alat
+                // --- Kotak Gambar Alat ---
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape =  RoundedCornerShape(16.dp),
@@ -147,16 +158,18 @@ fun DetailAlatScreen(
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
+                        // Jika gambar sukses dimuat, tampilkan gambarnya
                         bitmap?.let {
                             Image(
                                 bitmap = it.asImageBitmap(),
                                 contentDescription = "Foto Alat",
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Crop, // Agar gambar menutupi penuh kotak
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(220.dp)
                             )
                         } ?: Text(
+                            // Jika gambar gagal/tidak ada, tampilkan inisial 2 huruf dari nama barang
                             text = data.name.take(2).uppercase(),
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.primary,
@@ -167,7 +180,7 @@ fun DetailAlatScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // card info detail
+                // --- Kartu Info Detail ---
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape =  RoundedCornerShape(16.dp),
@@ -179,7 +192,7 @@ fun DetailAlatScreen(
                     Column(
                         modifier = Modifier.padding(20.dp)
                     ) {
-                        // Nama dan status sync
+                        // Nama dan badge status sinkronisasi
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -193,40 +206,28 @@ fun DetailAlatScreen(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            // Badge status sync
+                            // Tanda apakah data ini aman di server (Synced) atau masih nyangkut di HP (Pending)
                             val isSynced = data.sync_status == "synced"
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        color = if (isSynced)
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        else
-                                            Color(0xFFFFF3CD),
+                                        color = if (isSynced) MaterialTheme.colorScheme.primaryContainer else Color(0xFFFFF3CD),
                                         shape = RoundedCornerShape(8.dp)
                                     )
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = if (isSynced)
-                                            Icons.Default.Cloud
-                                        else
-                                            Icons.Default.CloudOff,
+                                        imageVector = if (isSynced) Icons.Default.Cloud else Icons.Default.CloudOff,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp),
-                                        tint = if (isSynced)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            Color(0xFF856404)
+                                        tint = if (isSynced) MaterialTheme.colorScheme.primary else Color(0xFF856404)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = if (isSynced) "Synced" else "Pending",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSynced)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            Color(0xFF856404)
+                                        color = if (isSynced) MaterialTheme.colorScheme.primary else Color(0xFF856404)
                                     )
                                 }
                             }
@@ -234,7 +235,7 @@ fun DetailAlatScreen(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Label kategori
+                        // Label Kategori
                         Box(
                             modifier = Modifier.background(
                                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -250,10 +251,11 @@ fun DetailAlatScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Baris info detail
+                        // Tiga baris statistik detail barang
                         DetailInfoRow(label = "Total Stok", value = "${data.total_qty}")
                         DetailInfoRow(label = "Stok Tersedia", value = "${data.available_qty}")
 
+                        // Mewarnai status kondisi alat: "good" -> primary (hijau/biru), lainnya -> merah
                         val kondisiColor = if (data.condition == "good") {
                             MaterialTheme.colorScheme.primary
                         } else {
@@ -269,7 +271,7 @@ fun DetailAlatScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // tombol edit
+                // --- Tombol Edit ---
                 Button(
                     onClick = {onEditClick(data.id)},
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -293,7 +295,7 @@ fun DetailAlatScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // tombol hapus
+                // --- Tombol Hapus (Outlined Merah) ---
                 OutlinedButton(
                     onClick = { showDeleteDialog = true },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -318,7 +320,7 @@ fun DetailAlatScreen(
                 }
             }
         } ?: run {
-            // Loading state
+            // Tampilan jika data masih proses diambil dari database
             Box(
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
                 contentAlignment = Alignment.Center
@@ -331,6 +333,10 @@ fun DetailAlatScreen(
     }
 }
 
+/**
+ * Komponen kecil bantuan untuk menyusun baris informasi di dalam Kartu Detail.
+ * Bentuknya: [Label (kiri)]           [Nilai (kanan)]
+ */
 @Composable
 private fun DetailInfoRow(
     label: String,

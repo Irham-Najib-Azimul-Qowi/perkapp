@@ -60,6 +60,12 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
     return ParsedDescription(peminjam, lokasi, kategori, deskripsi, isApproved, returnedTools)
 }
 
+/**
+ * KegiatanRepository — Antarmuka (Interface) untuk sumber data fitur Kegiatan.
+ *
+ * Mendefinisikan aturan dan fungsi apa saja yang bisa dipanggil oleh ViewModel
+ * terkait kegiatan (peminjaman, event, dll).
+ */
 interface KegiatanRepository {
     suspend fun getInventoryStats(): Result<InventoryStats>
     suspend fun getKegiatanAktif(): Result<List<Kegiatan>>
@@ -96,6 +102,20 @@ interface KegiatanRepository {
     suspend fun approveAlatForKegiatan(kegiatanId: String)
 }
 
+/**
+ * KegiatanRepositoryImpl — Implementasi nyata dari KegiatanRepository.
+ *
+ * Kelas ini menggabungkan dua sumber data utama:
+ * 1. Remote (API server via Retrofit) — untuk sinkronisasi ke cloud
+ * 2. Local (Room Database via DAO) — untuk offline-first (bisa dipakai tanpa internet)
+ *
+ * Aturan utama: Semua data dikembalikan dari database lokal (single source of truth).
+ * Server hanya digunakan untuk update/sync data di balik layar.
+ *
+ * @param apiService "Kurir" untuk mengirim/menerima data dari server
+ * @param dao "Pintu masuk" ke tabel kegiatan di database lokal SQLite
+ * @param context Konteks aplikasi (untuk cek status koneksi jaringan)
+ */
 class KegiatanRepositoryImpl(
     private val apiService: KegiatanApiService,
     private val dao: KegiatanDao,
@@ -163,8 +183,19 @@ class KegiatanRepositoryImpl(
         }
     }
 
+    /**
+     * Mengambil daftar kegiatan yang sedang aktif/berlangsung.
+     *
+     * Alur kerja:
+     * 1. Jika online, ambil data terbaru dari server (sync down)
+     * 2. Simpan/timpa data lokal dengan data server (kecuali yang statusnya pending/punya perubahan lokal)
+     * 3. Hapus kegiatan lokal jika di server sudah dihapus
+     * 4. Terakhir, selalu kembalikan daftar kegiatan dari database lokal
+     *
+     * @return Daftar kegiatan dalam bentuk domain model (Kegiatan)
+     */
     override suspend fun getKegiatanAktif(): Result<List<Kegiatan>> {
-        // Fetch from server first if online to ensure latest activities show up to all users
+        // Jika internet tersedia, ambil data dari server dulu agar data selalu up-to-date
         if (NetworkUtils.isOnline(context)) {
             try {
                 val response = apiService.getSemuaKegiatan()
@@ -343,6 +374,17 @@ class KegiatanRepositoryImpl(
         }
     }
 
+    /**
+     * Menambahkan kegiatan baru berserta daftar alat yang dipinjam.
+     *
+     * Alur kerja (Offline-first):
+     * 1. Buat ID acak lokal dan simpan kegiatan ke Room Database dengan status "pending create"
+     * 2. Simpan daftar alat (internal & eksternal) ke tabel kegiatan_alat dengan status "pending create"
+     * 3. Kurangi jumlah stok alat yang tersedia (available_qty) di tabel alat secara lokal
+     * 4. Jika sedang online, langsung coba kirim semua data ini ke server
+     *
+     * @return ID dari kegiatan yang baru dibuat
+     */
     override suspend fun insertKegiatanLocal(
         judul: String,
         kategori: String,
@@ -351,8 +393,8 @@ class KegiatanRepositoryImpl(
         status: String,
         peminjam: String,
         deskripsi: String,
-        tools: List<Pair<String, Int>>,
-        externalTools: List<String>
+        tools: List<Pair<String, Int>>, // Daftar ID alat internal dan jumlahnya
+        externalTools: List<String>     // Daftar alat dari luar (bukan milik inventaris)
     ): String {
         val kegiatanId = UUID.randomUUID().toString()
         val db = AppDatabase.getDatabase(context)
@@ -496,6 +538,16 @@ class KegiatanRepositoryImpl(
         return kegiatanId
     }
 
+    /**
+     * Memperbarui status peminjaman satu alat di dalam sebuah kegiatan.
+     *
+     * Dipanggil saat user mencentang/menghapus centang "Dikembalikan" pada alat.
+     *
+     * Alur kerja:
+     * 1. Ubah status 'isReturned' di database lokal menjadi true/false
+     * 2. Sesuaikan stok alat di tabel inventaris utama (tambah stok jika dikembalikan)
+     * 3. Jika online, langsung laporkan pembaruan ini ke server (masuk ke string deskripsi)
+     */
     override suspend fun updateKegiatanAlatStatusLocal(kegiatanAlatId: String, isReturned: Boolean) {
         val db = AppDatabase.getDatabase(context)
         val alatDao = db.alatDao()
@@ -579,6 +631,18 @@ class KegiatanRepositoryImpl(
         }
     }
 
+    /**
+     * Mengeksekusi antrean perubahan (pending_action) untuk disinkronisasi ke server.
+     *
+     * "Tukang pos" ini akan mengecek tabel Kegiatan dan Kegiatan_Alat:
+     * - "create" → Kirim POST untuk data baru
+     * - "update" → Kirim PUT/PATCH untuk perubahan data
+     * - "delete" → Kirim DELETE
+     *
+     * Jika sukses dikirim, status "pending" diubah menjadi "synced".
+     *
+     * @return true jika semua antrean berhasil dikirim, false jika ada yang gagal/error
+     */
     override suspend fun syncPendingKegiatan(): Boolean {
         if (!NetworkUtils.isOnline(context)) return false
         var success = true
@@ -736,6 +800,15 @@ class KegiatanRepositoryImpl(
         return success
     }
 
+    /**
+     * Menghapus kegiatan beserta alat-alat yang dipinjam di dalamnya.
+     *
+     * Jika dihapus, stok alat yang belum dikembalikan akan dikembalikan
+     * ke inventaris utama (available_qty bertambah).
+     *
+     * Penghapusan menggunakan "soft-delete" lokal (tandai "pending delete")
+     * agar SyncWorker tahu harus menghapusnya di server nanti saat online.
+     */
     override suspend fun deleteKegiatan(kegiatanId: String) {
         val db = AppDatabase.getDatabase(context)
         val alatDao = db.alatDao()
@@ -843,6 +916,12 @@ class KegiatanRepositoryImpl(
     }
 }
 
+/**
+ * FakeKegiatanRepository — Implementasi palsu untuk keperluan preview (Jetpack Compose) atau testing.
+ *
+ * Meneruskan semua panggilan ke KegiatanRepositoryImpl, 
+ * sering dipakai agar parameter ViewModel tidak error saat dirender di mode Preview.
+ */
 class FakeKegiatanRepository(private val context: Context) : KegiatanRepository {
     private val impl = KegiatanRepositoryImpl(
         com.example.perkapp.core.network.RetrofitClient.instance.create(KegiatanApiService::class.java),

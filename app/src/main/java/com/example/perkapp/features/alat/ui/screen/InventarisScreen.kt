@@ -55,6 +55,12 @@ import com.example.perkapp.features.alat.ui.component.AlatCard
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 import kotlinx.coroutines.flow.collectLatest
 
+/**
+ * InventarisScreen — Halaman Utama untuk melihat daftar semua Alat/Barang.
+ *
+ * Di halaman ini, pengguna (khususnya admin) dapat melihat daftar barang,
+ * jumlah stok, status sinkronisasi, dan tombol tambah barang.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InventarisScreen(
@@ -63,26 +69,28 @@ fun InventarisScreen(
     onItemClick: (String) -> Unit = {},
     onBackClick: () -> Unit = {}
 ) {
+    // Membaca daftar alat dan status loading dari ViewModel secara reaktif
     val alatList by viewModel.alatList.observeAsState(emptyList())
     val isLoading by viewModel.isLoading.observeAsState(false)
     val context = LocalContext.current
+    // Status offline/online awal
     var isOnline by remember { mutableStateOf(NetworkUtils.isOnline(context)) }
 
-    // Observasi status jaringan secara real-time
+    // Memantau perubahan status jaringan (internet) secara real-time
     LaunchedEffect(Unit) {
         NetworkUtils.observeNetworkStatus(context).collectLatest { online ->
             isOnline = online
+            // Jika tiba-tiba online, kita coba segarkan koneksi (silent login) dan ambil data terbaru
             if (online) {
-                // Lakukan silent login terlebih dahulu agar request ke server sukses terautentikasi
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     com.example.perkapp.core.network.RetrofitClient.performSilentLogin(context)
                 }
-                // Refresh data saat kembali online
                 viewModel.getAllAlat()
             }
         }
     }
 
+    // Mengambil data saat layar ini pertama kali dimunculkan
     LaunchedEffect(Unit) {
         viewModel.getAllAlat()
     }
@@ -112,6 +120,7 @@ fun InventarisScreen(
                 )
             )
         },
+        // Tombol (+) melayang di pojok kanan bawah
         floatingActionButton = {
             FloatingActionButton(
                 onClick =  onAddClick,
@@ -136,7 +145,8 @@ fun InventarisScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Banner offline
+            // --- Peringatan Kuning Mode Offline ---
+            // Muncul secara meluncur/animasi jika internet mati
             AnimatedVisibility(
                 visible = !isOnline,
                 enter = slideInVertically() + fadeIn(),
@@ -164,10 +174,11 @@ fun InventarisScreen(
                 }
             }
 
+            // --- Menangani Tampilan Saat Sedang Loading, Kosong, Atau Ada Data ---
             if (isLoading) {
+                // Menampilkan efek putar loading
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
@@ -176,9 +187,9 @@ fun InventarisScreen(
                     )
                 }
             } else if (alatList.isEmpty()){
+                // Menampilkan pesan kosong jika belum ada data alat sama sekali
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -198,14 +209,14 @@ fun InventarisScreen(
                     }
                 }
             } else {
-                // Dashboard ringkasan status alat
+                // --- Menampilkan Dashboard Ringkasan & Daftar Alat ---
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Total Alat
+                    // Kotak Kiri: Total Alat
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -232,7 +243,7 @@ fun InventarisScreen(
                         }
                     }
 
-                    // Pending/Sync Status
+                    // Kotak Kanan: Status Pending (Belum dikirim ke server)
                     val pendingCount = alatList.count { it.sync_status == "pending" }
                     Box(
                         modifier = Modifier
@@ -261,6 +272,7 @@ fun InventarisScreen(
                     }
                 }
 
+                // LazyColumn adalah daftar yang bisa di-scroll secara efisien (hanya merender item yang terlihat)
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 16.dp),

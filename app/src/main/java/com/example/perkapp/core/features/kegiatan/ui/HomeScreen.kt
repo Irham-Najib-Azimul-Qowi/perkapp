@@ -26,6 +26,22 @@ import com.example.perkapp.features.kegiatan.domain.HomeUiState
 import com.example.perkapp.features.kegiatan.domain.Kegiatan
 import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 
+/**
+ * HomeScreen — Halaman beranda utama (Dashboard) dari aplikasi.
+ *
+ * Halaman ini menampilkan ringkasan kegiatan yang sedang aktif/berlangsung.
+ * Berfungsi sebagai titik awal pengguna setelah berhasil login.
+ *
+ * @param navController Controller untuk navigasi antar halaman
+ * @param viewModel ViewModel penyedia data untuk beranda
+ * @param onNavigateToActivities Aksi saat ingin melihat semua aktivitas
+ * @param onNavigateToInventory Aksi saat ingin melihat inventaris alat
+ * @param onNavigateToHistory Aksi saat ingin melihat riwayat
+ * @param onNavigateToProfile Aksi saat ingin membuka profil
+ * @param onNavigateToBorrow Aksi meminjam
+ * @param onNavigateToLogActivity Aksi log aktivitas
+ * @param onDetailClick Aksi saat salah satu kegiatan diklik (membuka detail)
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen( 
@@ -39,6 +55,7 @@ fun HomeScreen(
     onNavigateToLogActivity: () -> Unit = {},
     onDetailClick: (String) -> Unit = {}
 ) {
+    // Mengamati state dari ViewModel (loading, daftar kegiatan, error)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -140,6 +157,12 @@ fun HomeScreen(
     }
 }
 
+/**
+ * KartuKegiatan — Komponen UI (Card) untuk menampilkan ringkasan satu kegiatan.
+ *
+ * @param kegiatan Objek data kegiatan yang akan ditampilkan
+ * @param onClick Aksi yang dipanggil saat kartu ini ditekan/diklik
+ */
 @Composable
 fun KartuKegiatan(
     kegiatan: Kegiatan,
