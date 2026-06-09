@@ -25,11 +25,22 @@ sealed class BottomNavItem(val route: String, val title: String, val icon: Image
 }
 
 /**
- * BottomBar — Komponen menu navigasi di bagian bawah aplikasi.
- *
- * Menu ini cerdas: ia hanya akan muncul jika pengguna sedang berada di 
- * halaman Home, Kegiatan, atau Profil. Jika masuk ke halaman Detail, 
- * menu ini akan otomatis sembunyi.
+ * FUNGSI: BottomBar
+ * TUJUAN: Merender (menampilkan) menu navigasi utama di bagian bawah layar HP.
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Mendefinisikan 3 tombol utama (`items`): Home, Kegiatan, Profil.
+ * 2. Memantau (`observe`) secara *real-time* pengguna sedang ada di layar mana
+ *    menggunakan `currentBackStackEntryAsState()`.
+ * 3. Memutuskan apakah menu ini harus Tampil atau Sembunyi (`showBottomBar`).
+ *    Menu ini cerdas: ia otomatis menghilang saat pengguna masuk ke halaman 
+ *    sekunder (seperti form Tambah Data atau halaman Detail) agar area layar lebih luas.
+ * 4. Jika harus tampil, ia merender komponen `NavigationBar` bawaan Jetpack Compose
+ *    dan mengisi tombol-tombolnya.
+ * 5. Saat sebuah tombol diklik, navigasi diatur menggunakan metode `popUpTo` agar
+ *    tidak terjadi penumpukan *history* layar (yang bikin HP lemot atau harus nge-back 100x).
+ * 
+ * @param navController Alat pengendali navigasi untuk memberikan perintah pindah layar.
  */
 @Composable
 fun BottomBar(navController: NavHostController) {

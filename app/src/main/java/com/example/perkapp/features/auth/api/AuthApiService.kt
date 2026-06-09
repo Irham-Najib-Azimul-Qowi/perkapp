@@ -31,19 +31,39 @@ data class UserDto(
  */
 interface AuthApiService {
     
-    // Rute untuk Login
+    /**
+     * FUNGSI: login
+     * TUJUAN: Menembak rute `/auth/login` (POST) ke server untuk mencocokkan email dan password.
+     * @param request Bungkusan data (DTO) berisi email dan password.
+     * @return Pembungkus standar `ApiResponse` berisi data kredensial (`AuthDataResponse`).
+     */
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): ApiResponse<AuthDataResponse>
 
-    // Rute untuk Mendaftar akun baru
+    /**
+     * FUNGSI: register
+     * TUJUAN: Mengirim data pengguna baru ke rute `/auth/register` (POST) agar dicatat di database server.
+     * @param request Bungkusan data pendaftaran (nama, email, password, role).
+     * @return Respon sukses berserta token otentikasi.
+     */
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): ApiResponse<AuthDataResponse>
 
-    // Rute untuk mengambil profil saya (akun yang sedang dipakai)
+    /**
+     * FUNGSI: getProfile
+     * TUJUAN: Mengambil data diri "Saya" (user yang sedang login) dari rute `/auth/me` (GET).
+     * Membutuhkan Token (Bearer) di Header (yang diurus oleh AuthInterceptor).
+     * @return Data profil pengguna dalam bentuk DTO.
+     */
     @GET("auth/me")
     suspend fun getProfile(): ApiResponse<UserDto>
 
-    // Rute untuk melihat seluruh pengguna yang terdaftar di aplikasi
+    /**
+     * FUNGSI: getAllUsers
+     * TUJUAN: Menarik daftar seluruh pengguna yang terdaftar di sistem dari rute `/users` (GET).
+     * Biasa dipakai untuk mengisi dropdown pilihan nama peminjam saat membuat form kegiatan.
+     * @return List/Daftar dari sekumpulan data profil (UserDto).
+     */
     @GET("users")
     suspend fun getAllUsers(): ApiResponse<List<UserDto>>
 }

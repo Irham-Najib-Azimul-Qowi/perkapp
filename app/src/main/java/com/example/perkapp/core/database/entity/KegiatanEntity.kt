@@ -4,10 +4,14 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * KegiatanEntity — Merepresentasikan satu baris data di tabel 'kegiatan'.
+ * KegiatanEntity — Struktur Data (Tabel) Induk untuk Peminjaman.
  *
- * Tabel ini menyimpan riwayat peminjaman/event/kegiatan yang melibatkan
- * penggunaan alat dari inventaris.
+ * MENGAPA TABEL INI PENTING?
+ * Tabel ini merekam "Kapan, di mana, dan untuk keperluan apa" alat-alat lab 
+ * dikeluarkan dari ruangan. Setiap baris di tabel ini adalah formulir pengajuan 
+ * peminjaman barang. Kolom `sync_status` dan `pending_action` memastikan bahwa
+ * jika user menekan tombol "Simpan" saat sedang di lapangan tanpa internet, 
+ * datanya aman di HP dan akan diluncurkan ke server otomatis setelah dapat sinyal.
  */
 @Entity(tableName = "kegiatan")
 data class KegiatanEntity(

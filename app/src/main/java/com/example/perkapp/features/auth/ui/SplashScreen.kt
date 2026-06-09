@@ -17,11 +17,16 @@ import com.example.perkapp.core.datastore.dataStore
 import kotlinx.coroutines.delay
 
 /**
- * SplashScreen — Layar pertama yang muncul saat aplikasi dibuka.
- *
- * Fungsinya bukan sekadar pajangan, tapi juga sebagai tempat "berpikir" aplikasi:
- * "Apakah user ini sudah login sebelumnya atau belum?"
- * Jika sudah, langsung lempar ke Home. Jika belum, lempar ke layar Login.
+ * FUNGSI: SplashScreen
+ * TUJUAN: Menjadi layar pertama yang dilihat pengguna saat aplikasi baru dibuka.
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Layar ini bukan sekadar pajangan, tetapi ia memiliki tugas berat di balik layar:
+ *    Membaca DataStore (memori HP) untuk mencari `auth_token`.
+ * 2. Selama proses pencarian (`token == "LOADING"`), ia akan menahan pengguna di layar ini.
+ * 3. Jika token ditemukan (dan valid), ia langsung mengalihkan rute ke `Home`.
+ * 4. Jika token kosong/tidak ada, ia mengarahkan rute ke halaman `Login`.
+ * (Ada sedikit jeda `delay` agar logo aplikasi sempat terlihat secara visual).
  */
 @Composable
 fun SplashScreen(

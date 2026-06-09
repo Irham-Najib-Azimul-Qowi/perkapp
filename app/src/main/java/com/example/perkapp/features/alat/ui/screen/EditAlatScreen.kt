@@ -59,11 +59,17 @@ import com.example.perkapp.features.alat.data.remote.CreateAlatRequest
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
 /**
- * EditAlatScreen — Halaman form untuk mengubah detail barang.
+ * FUNGSI: EditAlatScreen
+ * TUJUAN: Antarmuka bagi Admin untuk memperbarui atau mengoreksi data barang yang sudah ada.
  *
- * Persis seperti TambahAlatScreen, namun perbedaannya form ini 
- * langsung terisi data-data lama dari barang tersebut sehingga 
- * kita tidak perlu repot mengetik ulang.
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Sangat mirip dengan `TambahAlatScreen`, tetapi ia membutuhkan parameter `alatId`.
+ * 2. `LaunchedEffect(alatId)` akan memancing ViewModel mengambil data lama.
+ * 3. Ketika data lama tiba (`alat != null`), ia secara otomatis mengisi (Populate) 
+ *    semua kolom input (Nama, Kategori, Jumlah, Kondisi) agar admin tidak perlu mengetik dari nol.
+ * 4. Menyediakan opsi mengganti foto (Kamera/Galeri). Jika tidak diganti, foto lama dipertahankan.
+ * 5. Ketika "Simpan Perubahan" ditekan, validasi kembali berjalan, dan fungsi 
+ *    `updateAlat()` dari ViewModel dipanggil untuk menimpa data lama di Database Lokal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

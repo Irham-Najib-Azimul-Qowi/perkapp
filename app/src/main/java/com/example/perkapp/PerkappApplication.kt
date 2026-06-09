@@ -25,9 +25,23 @@ class PerkappApplication : Application() {
             private set
     }
 
+    /**
+     * FUNGSI: onCreate
+     * 
+     * TUJUAN:
+     * Ini adalah metode yang paling pertama dieksekusi di seluruh sistem aplikasi. 
+     * Berjalan hanya sekali selama aplikasi hidup. Fungsi utamanya di sini adalah 
+     * mendaftarkan 'instance' aplikasi agar mudah diakses secara global.
+     * 
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. `super.onCreate()` wajib dipanggil agar sistem Android dapat menginisialisasi 
+     *    inti aplikasi dan *dependency injection* dari Hilt.
+     * 2. `instance = this` menugaskan variabel global dengan objek aplikasi saat ini. 
+     *    Ini sangat berguna di kelas-kelas yang tidak bisa disuntik *Context* (seperti `RetrofitClient`), 
+     *    sehingga mereka tetap bisa membaca DataStore atau utilitas lainnya.
+     */
     override fun onCreate() {
         super.onCreate()
-        // Menyimpan referensi aplikasi ke dalam instance saat aplikasi pertama kali dibuka
         instance = this
     }
 }

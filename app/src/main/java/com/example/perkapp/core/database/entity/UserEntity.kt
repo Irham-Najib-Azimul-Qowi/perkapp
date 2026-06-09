@@ -4,9 +4,13 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * UserEntity — Merepresentasikan satu baris data di tabel 'users'.
+ * UserEntity — Struktur Data (Tabel) Profil Aktif.
  *
- * Kelas ini menyimpan informasi akun dari pengguna yang sedang aktif (login).
+ * MENGAPA TABEL INI PENTING?
+ * Tabel ini sangat eksklusif karena hanya boleh berisi MAKSIMAL 1 BARIS DATA.
+ * Siapa pun yang datanya ada di tabel ini, dialah orang yang sedang "Memegang HP" 
+ * dan aktif login ke dalam aplikasi. Jika user menekan tombol Logout, 
+ * data di tabel ini akan dikosongkan (di-wipe).
  */
 @Entity(tableName = "users")
 data class UserEntity(

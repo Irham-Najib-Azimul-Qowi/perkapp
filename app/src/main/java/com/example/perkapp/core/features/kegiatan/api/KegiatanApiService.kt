@@ -1,3 +1,21 @@
+/**
+ * File: KegiatanApiService.kt
+ *
+ * FUNGSI UTAMA:
+ * File ini berisi antarmuka (interface) Retrofit untuk melakukan komunikasi HTTP (REST API)
+ * dengan backend (Laravel) terkait fitur kegiatan/peminjaman alat.
+ *
+ * PENJELASAN MENDALAM:
+ * Di Retrofit, kita mendefinisikan endpoint API sebagai fungsi-fungsi Kotlin abstrak.
+ * Setiap fungsi menggunakan anotasi HTTP (@GET, @POST, @PUT, @DELETE) yang menentukan:
+ * 1. Method HTTP yang digunakan.
+ * 2. Path (URL) endpoint relatif terhadap Base URL.
+ * 3. Parameter request (Query, Path, atau Body).
+ *
+ * File ini juga memuat semua Data Transfer Object (DTO) — yaitu kelas-kelas data (data class)
+ * yang memodelkan format JSON yang dikirimkan (Request) atau diterima (Response) dari server.
+ * DTO ini akan otomatis dikonversi dari/ke JSON oleh Gson/Moshi yang dikonfigurasi di RetrofitClient.
+ */
 package com.example.perkapp.features.kegiatan.api
 
 import retrofit2.http.*
@@ -79,46 +97,73 @@ data class GeneralApiResponse(
 )
 
 /**
- * KegiatanApiService — Rute API untuk fitur Peminjaman/Kegiatan.
+ * FUNGSI: KegiatanApiService
+ * TUJUAN: Menjadi pintu gerbang utama antara aplikasi Android (Client) dengan
+ * server backend (API) khusus untuk fitur Peminjaman/Kegiatan.
  */
 interface KegiatanApiService {
 
-    // Mengambil data rangkuman statistik untuk halaman depan (Home/Beranda)
+    /**
+     * FUNGSI: getHomeData
+     * TUJUAN: Menarik rangkuman statistik untuk ditampilkan di layar Beranda (Dashboard),
+     * seperti jumlah barang dipinjam, tersedia, dan daftar kegiatan yang sedang aktif.
+     */
     @GET("home/data")
     suspend fun getHomeData(): HomeDataResponse
 
-    // Mengambil seluruh riwayat acara/kegiatan yang ada
+    /**
+     * FUNGSI: getSemuaKegiatan
+     * TUJUAN: Mengambil daftar riwayat seluruh kegiatan.
+     * @param status (Opsional) Parameter filter, contoh: "?status=ongoing" untuk melihat 
+     *               kegiatan yang sedang berjalan saja.
+     */
     @GET("kegiatan")
     suspend fun getSemuaKegiatan(
-        @Query("status") status: String? = null // Bisa difilter misalnya: "?status=ongoing"
+        @Query("status") status: String? = null
     ): KegiatanListWrapperResponse
 
-    // Mengambil rincian detail 1 kegiatan tertentu
+    /**
+     * FUNGSI: getDetailKegiatan
+     * TUJUAN: Menarik informasi rincian dari satu kegiatan spesifik berdasarkan ID-nya.
+     */
     @GET("kegiatan/{id}")
     suspend fun getDetailKegiatan(
         @Path("id") id: String
     ): KegiatanWrapperResponse
 
-    // Membuat kegiatan baru
+    /**
+     * FUNGSI: createKegiatan
+     * TUJUAN: Mengirimkan form pendaftaran kegiatan baru ke server.
+     */
     @POST("kegiatan")
     suspend fun createKegiatan(
         @Body request: CreateKegiatanRequest
     ): KegiatanWrapperResponse
 
-    // Memperbarui informasi kegiatan (termasuk acc peminjaman)
+    /**
+     * FUNGSI: updateKegiatan
+     * TUJUAN: Mengubah informasi atau status (misalnya dari 'pending' menjadi 'ongoing') 
+     * sebuah kegiatan di server.
+     */
     @PUT("kegiatan/{id}")
     suspend fun updateKegiatan(
         @Path("id") id: String,
         @Body request: UpdateKegiatanRequest
     ): KegiatanWrapperResponse
 
-    // Menghapus kegiatan
+    /**
+     * FUNGSI: deleteKegiatan
+     * TUJUAN: Memusnahkan riwayat kegiatan tertentu dari database server.
+     */
     @DELETE("kegiatan/{id}")
     suspend fun deleteKegiatan(
         @Path("id") id: String
     ): GeneralApiResponse
 
-    // Menyisipkan daftar pinjaman alat ke dalam sebuah kegiatan
+    /**
+     * FUNGSI: addToolToKegiatan
+     * TUJUAN: Mengaitkan (meminjamkan) sejumlah barang ke dalam suatu kegiatan spesifik.
+     */
     @POST("kegiatan-alat")
     suspend fun addToolToKegiatan(
         @Body request: AddToolToKegiatanRequest

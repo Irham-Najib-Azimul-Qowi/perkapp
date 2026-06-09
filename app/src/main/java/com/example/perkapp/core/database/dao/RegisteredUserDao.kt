@@ -15,16 +15,33 @@ import com.example.perkapp.core.database.entity.RegisteredUserEntity
  */
 @Dao
 interface RegisteredUserDao {
-    // Menyimpan daftar banyak user sekaligus ke database lokal
-    // Jika ada ID yang sama, timpa dengan data terbaru dari server
+    /**
+     * FUNGSI: insertAll
+     * TUJUAN: Menyimpan daftar massal (Bulk Insert) seluruh pengguna yang ada di sistem server 
+     * ke dalam database lokal perangkat (Room). Jika ID pengguna sudah terdaftar, 
+     * datanya akan ditimpa dengan versi terbaru (`OnConflictStrategy.REPLACE`).
+     * @param users List daftar pengguna dari API.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(users: List<RegisteredUserEntity>)
 
-    // Mengambil semua daftar user yang tersimpan di memori HP
+    /**
+     * FUNGSI: getAllRegisteredUsers
+     * TUJUAN: Membaca daftar seluruh pengguna sistem yang telah diunduh dan tersimpan di HP.
+     * Sangat berguna saat perangkat offline (tidak ada sinyal), aplikasi tetap bisa 
+     * menampilkan pilihan nama "Peminjam" pada form tambah kegiatan tanpa perlu tembak API.
+     * @return List entitas pengguna terdaftar.
+     */
     @Query("SELECT * FROM registered_users")
     suspend fun getAllRegisteredUsers(): List<RegisteredUserEntity>
 
-    // Menghapus seluruh daftar user (misal: saat mau ambil data baru dari server)
+    /**
+     * FUNGSI: clearAll
+     * TUJUAN: Mengosongkan seluruh tabel `registered_users`.
+     * Metode ini umumnya dipanggil persis sebelum menarik (fetch) data terbaru dari server,
+     * agar data pengguna lama yang mungkin sudah dihapus oleh admin di server tidak 
+     * menumpuk dan menjadi data "hantu" di HP.
+     */
     @Query("DELETE FROM registered_users")
     suspend fun clearAll()
 }

@@ -21,32 +21,55 @@ import java.net.ResponseCache
  */
 interface AlatApiService {
 
-    // Mengambil seluruh data alat dari server
+    /**
+     * FUNGSI: getAllAlat
+     * TUJUAN: Menembak rute `/alat` (GET) untuk mengunduh seluruh daftar barang inventaris 
+     * dari server secara bersamaan.
+     * @return Daftar alat (`List<AlatResponse>`) berbalut kotak `ApiResponse` dan dibungkus 
+     *         oleh `Response` (agar bisa baca kode HTTP 200).
+     */
     @GET("alat")
     suspend fun getAllAlat(): Response<ApiResponse<List<AlatResponse>>>
 
-    // Mengambil rincian hanya 1 alat spesifik
+    /**
+     * FUNGSI: getAlatById
+     * TUJUAN: Mengambil rincian lebih dalam untuk 1 buah barang spesifik menggunakan rute `/alat/{id}` (GET).
+     * @param id String identitas unik barang.
+     */
     @GET("alat/{id}")
     suspend fun getAlatById(
-        @Path("id") id: String // Mengganti teks "{id}" dengan ID alat yang dikirim
+        @Path("id") id: String
     ): Response<ApiResponse<AlatResponse>>
 
-    // Menambahkan/mendaftarkan alat baru ke server
+    /**
+     * FUNGSI: createAlat
+     * TUJUAN: Menambahkan/mendaftarkan alat baru ke server melalui rute `/alat` (POST).
+     * @param request Data form barang yang diinput pengguna.
+     */
     @POST("alat")
     suspend fun createAlat(
         @Body request: CreateAlatRequest
     ): Response<ApiResponse<AlatResponse>>
 
-    // Memperbarui informasi alat yang sudah ada
+    /**
+     * FUNGSI: updateAlat
+     * TUJUAN: Mengubah (Edit) informasi alat yang sudah ada di rute `/alat/{id}` (PUT).
+     * @param id ID barang yang ingin diedit.
+     * @param request Data form barang terbaru (hasil editan).
+     */
     @PUT("alat/{id}")
     suspend fun updateAlat(
         @Path("id") id: String,
         @Body request: CreateAlatRequest
     ): Response<ApiResponse<AlatResponse>>
 
-    // Menghapus sebuah alat dari sistem server
+    /**
+     * FUNGSI: deleteAlat
+     * TUJUAN: Menghapus sebuah alat dari database server melalui rute `/alat/{id}` (DELETE).
+     * @param id ID barang yang akan dimusnahkan.
+     */
     @DELETE("alat/{id}")
     suspend fun deleteAlat(
         @Path("id") id: String
-    ): Response<ApiResponse<Unit>> // 'Unit' berarti server tidak membalas apa-apa
+    ): Response<ApiResponse<Unit>> // 'Unit' berarti server tidak membalas data apa-apa selain status 200
 }

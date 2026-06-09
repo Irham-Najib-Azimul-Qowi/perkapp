@@ -1,17 +1,19 @@
 package com.example.perkapp.core.network
 
 /**
- * ApiResponse — Wadah (Pembungkus) standar untuk setiap jawaban server.
+ * ApiResponse — Wadah (Pembungkus/Wrapper) Standar Respon Server.
  *
- * Server Laravel di aplikasi ini selalu mengirimkan JSON dengan format:
- * {
- *   "success": true/false,
- *   "message": "Pesan sukses/error",
- *   "data": { ...isi data... }
- * }
- * Kelas ini mempermudah kita membaca format baku tersebut.
- * Huruf <T> (Generic) artinya isi `data` bisa berubah-ubah 
- * (bisa berupa List, Objek Tunggal, atau Kosong).
+ * MENGAPA KELAS INI DIBUAT?
+ * Backend (Laravel) yang melayani aplikasi ini selalu mengirim data dengan pola 
+ * JSON yang kaku (seragam) di semua ujung-pangkal rute (endpoint).
+ * Polanya selalu terdiri dari 3 pasang kunci:
+ * 1. "success": penanda boolean (true/false) operasi di server berhasil.
+ * 2. "message": pesan teks manusiawi (contoh: "Login Berhasil", "Kata sandi salah").
+ * 3. "data": isi utama yang diminta (bisa daftar barang, token, atau null).
+ *
+ * Dengan mendefinisikan kelas `<T>` (Generic) ini, Retrofit tidak akan kebingungan 
+ * menerjemahkan respon API menjadi objek Kotlin. Variabel `T` bisa diganti 
+ * menjadi `UserEntity`, `List<AlatEntity>`, dsb sesuai kebutuhan halaman.
  */
 data class ApiResponse<T>(
     // Penanda berhasil atau gagal dari server

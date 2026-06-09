@@ -27,9 +27,9 @@ import com.example.perkapp.features.kegiatan.domain.Kegiatan
 import com.example.perkapp.features.kegiatan.domain.StatusKegiatan
 
 /**
- * HomeScreen — Halaman beranda utama (Dashboard) dari aplikasi.
- *
- * Halaman ini menampilkan ringkasan kegiatan yang sedang aktif/berlangsung.
+ * FUNGSI: HomeScreen
+ * TUJUAN: Halaman beranda utama (Dashboard) dari aplikasi.
+ * Menampilkan ringkasan kegiatan yang sedang aktif/berlangsung.
  * Berfungsi sebagai titik awal pengguna setelah berhasil login.
  *
  * @param navController Controller untuk navigasi antar halaman
@@ -158,7 +158,8 @@ fun HomeScreen(
 }
 
 /**
- * KartuKegiatan — Komponen UI (Card) untuk menampilkan ringkasan satu kegiatan.
+ * FUNGSI: KartuKegiatan
+ * TUJUAN: Komponen UI (Card) untuk menampilkan ringkasan satu kegiatan.
  *
  * @param kegiatan Objek data kegiatan yang akan ditampilkan
  * @param onClick Aksi yang dipanggil saat kartu ini ditekan/diklik

@@ -56,10 +56,20 @@ import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 import kotlinx.coroutines.flow.collectLatest
 
 /**
- * InventarisScreen — Halaman Utama untuk melihat daftar semua Alat/Barang.
+ * FUNGSI: InventarisScreen
+ * TUJUAN: Menjadi Halaman Utama (Beranda) bagi Admin untuk melihat isi gudang.
  *
- * Di halaman ini, pengguna (khususnya admin) dapat melihat daftar barang,
- * jumlah stok, status sinkronisasi, dan tombol tambah barang.
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Saat pertama kali dibuka (`LaunchedEffect`), layar menyuruh `AlatViewModel`
+ *    untuk mengambil daftar alat (`getAllAlat`).
+ * 2. Memantau `NetworkUtils` secara realtime. Bila internet putus, 
+ *    muncul *Banner Kuning* peringatan *Offline* menggunakan animasi turun (`slideInVertically`).
+ * 3. Jika internet hidup kembali secara tiba-tiba, ia mencoba *Silent Login* 
+ *    (memulihkan token) dan memuat ulang barang.
+ * 4. Menyediakan dua kotak *Dashboard* di atas (Total Alat & Status Penyimpanan).
+ * 5. Menggunakan `LazyColumn` untuk merender daftar `AlatCard` satu per satu
+ *    dengan irit memori (hanya memuat elemen yang terlihat di layar).
+ * 6. Menyediakan Tombol Tambah `+` (FAB) di pojok untuk menambah barang baru.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

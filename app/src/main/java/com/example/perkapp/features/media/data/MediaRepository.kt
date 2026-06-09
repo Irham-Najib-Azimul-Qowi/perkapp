@@ -11,8 +11,10 @@ import java.io.File
 import java.util.UUID
 
 /**
- * MediaRepository — Sumber data khusus untuk pengelolaan media (terutama gambar).
+ * FUNGSI: MediaRepository
+ * TUJUAN: Sumber data khusus untuk pengelolaan media (terutama gambar).
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Repository ini menangani penyimpanan gambar ke database lokal (mode offline)
  * serta proses upload gambar fisik (Multipart) ke server (mode online).
  */
@@ -24,14 +26,17 @@ class MediaRepository(
     private val context: Context
 ) {
     /**
-     * Mengambil daftar semua gambar yang terkait dengan satu alat spesifik.
+     * FUNGSI: getImagesForAlat
+     * TUJUAN: Mengambil daftar semua gambar yang terkait dengan satu alat spesifik.
      */
     suspend fun getImagesForAlat(alatId: String): List<ImageEntity> {
         return dao.getImagesForEntity("alat", alatId)
     }
 
     /**
-     * Menyimpan referensi gambar secara lokal (offline) ke dalam tabel SQLite.
+     * FUNGSI: saveImageLocally
+     * TUJUAN: Menyimpan referensi gambar secara lokal (offline) ke dalam tabel SQLite.
+     * ALUR LOGIKA PENGERJAAN:
      * Gambar ini akan ditandai dengan status "pending", yang artinya 
      * aplikasinya harus mengunggah (upload) gambar ini ke server nanti saat ada internet.
      *
@@ -52,8 +57,9 @@ class MediaRepository(
     }
 
     /**
-     * Mencoba mengunggah gambar fisik ke server.
-     *
+     * FUNGSI: uploadImage
+     * TUJUAN: Mencoba mengunggah gambar fisik ke server.
+     * ALUR LOGIKA PENGERJAAN:
      * Jika gagal (misal tidak ada internet atau server error), gambar tidak akan hilang,
      * melainkan tetap tersimpan di database lokal dengan status "pending" agar
      * bisa dicoba upload kembali di lain waktu.
@@ -99,7 +105,9 @@ class MediaRepository(
     }
 
     /**
-     * Fungsi internal untuk mencoba mengirim ulang satu gambar yang masih berstatus pending.
+     * FUNGSI: tryUploadImage
+     * TUJUAN: Fungsi internal untuk mencoba mengirim ulang satu gambar yang masih berstatus pending.
+     * ALUR LOGIKA PENGERJAAN:
      * Digunakan secara massal oleh proses SyncWorker.
      */
     private suspend fun tryUploadImage(image: ImageEntity): Boolean {
@@ -150,7 +158,9 @@ class MediaRepository(
     }
 
     /**
-     * Mensinkronisasi semua gambar yang belum terkirim ("pending") ke server.
+     * FUNGSI: syncPendingImages
+     * TUJUAN: Mensinkronisasi semua gambar yang belum terkirim ("pending") ke server.
+     * ALUR LOGIKA PENGERJAAN:
      * Biasanya fungsi ini dipanggil di belakang layar oleh SyncWorker setiap kali
      * aplikasi mendeteksi ada koneksi internet.
      *

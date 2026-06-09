@@ -58,10 +58,17 @@ import com.example.perkapp.core.utils.ImageUtils
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
 /**
- * TambahAlatScreen — Halaman form untuk memasukkan barang baru ke inventaris.
+ * FUNGSI: TambahAlatScreen
+ * TUJUAN: Menyediakan antarmuka pendaftaran barang baru ke dalam sistem.
  *
- * Mendukung input data dasar (nama, kategori, jumlah, kondisi) serta
- * pengambilan foto barang langsung dari kamera atau galeri HP.
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Mengelola banyak *State* untuk menyimpan tulisan di setiap kolom (Nama, Kategori, dst).
+ * 2. Menyediakan 2 *Launcher* (Kamera & Galeri) bawaan sistem Android.
+ *    - Kamera akan memotret, mengubahnya jadi `Bitmap`, dan menyimpannya ke memori internal.
+ *    - Galeri akan mengambil foto (`URI`) dan menyalinnya ke memori internal.
+ * 3. Ketika tombol "Simpan" diklik, sistem mengecek kelengkapan (*Validasi*) 
+ *    menggunakan instruksi *If-Else*. Jika kosong, muncul `Toast` teguran.
+ * 4. Jika valid, form akan diracik dan diserahkan pada `createAlat()` di ViewModel.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

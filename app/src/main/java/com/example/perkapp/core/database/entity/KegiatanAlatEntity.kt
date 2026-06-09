@@ -4,10 +4,13 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * KegiatanAlatEntity — Merepresentasikan tabel penghubung ('kegiatan_alat').
+ * KegiatanAlatEntity — Struktur Data (Tabel) Penghubung Many-to-Many.
  *
- * Tabel ini menyimpan informasi tentang "Alat apa saja yang dipinjam
- * di dalam suatu kegiatan tertentu?". Satu kegiatan bisa meminjam banyak alat.
+ * MENGAPA TABEL INI ADA?
+ * Karena satu "Kegiatan" (acara) bisa meminjam banyak "Alat" (barang), 
+ * dan satu "Alat" bisa dipinjam oleh banyak "Kegiatan" yang berbeda pada waktu yang berbeda.
+ * Tabel ini bertindak sebagai jembatan (Pivot Table) yang merekam rincian transaksi:
+ * "Berapa banyak barang A yang dipinjam pada acara B, dan apakah sudah dikembalikan?"
  */
 @Entity(tableName = "kegiatan_alat")
 data class KegiatanAlatEntity(

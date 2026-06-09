@@ -14,7 +14,10 @@ data class ImageUploadResponse(
 )
 
 /**
- * MediaApiService — Rute API khusus untuk mengunggah berkas/file fisik.
+ * FUNGSI: MediaApiService
+ * TUJUAN: Rute API khusus untuk mengunggah berkas/file fisik (gambar).
+ * ALUR LOGIKA PENGERJAAN:
+ * Mendefinisikan endpoint untuk mengirim file fisik (MultipartBody.Part) beserta data teks ke server.
  */
 interface MediaApiService {
     

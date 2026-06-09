@@ -36,15 +36,22 @@ class AlatRepository(
     }
 
     /**
-     * Mengambil semua daftar alat.
+     * FUNGSI: getAllAlat
+     * TUJUAN: Mengambil dan merakit seluruh daftar barang inventaris. Berperan sebagai 
+     * mekanisme *Single Source of Truth* di mana database lokal (SQLite) selalu menjadi 
+     * prioritas bacaan agar aplikasi terasa instan.
      *
-     * Cara kerja:
-     * 1. Jika online: minta data terbaru dari server, simpan/perbarui database lokal, 
-     *    kecuali data yang masih berstatus "pending" (punya perubahan lokal).
-     * 2. Jika offline: langsung melewati proses API.
-     * 3. Selalu mengembalikan daftar alat dari database lokal (single source of truth).
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Mengecek Internet: Bila sedang online, ia akan membajak *thread* untuk meminta data segar dari server.
+     * 2. Resolusi Konflik: Membaca tabel `alat` SQLite untuk mencari barang-barang yang 
+     *    memiliki status `pending` (belum sempat terkirim karena offline). 
+     * 3. Menyimpan Data Segar: Ia menimpa (`Update`) atau menyisipkan (`Insert`) data 
+     *    dari server ke tabel SQLite, **KECUALI** pada barang yang statusnya `pending`.
+     *    (Hal ini mencegah hasil editan pengguna yang belum terkirim tiba-tiba ter-reset oleh server).
+     * 4. Perbaikan Gambar (*Auto-Repair*): Memastikan setiap tautan (*path*) gambar cocok.
+     * 5. Akhir: Apapun yang terjadi, kembalikan daftar barang langsung dari `AlatDao` (Database Lokal).
      *
-     * @return List berisi AlatEntity dari database lokal.
+     * @return List/Koleksi alat (`AlatEntity`).
      */
     suspend fun getAllAlat(): List<AlatEntity> {
         // Mengecek apakah perangkat sedang terhubung ke internet
@@ -129,13 +136,19 @@ class AlatRepository(
     }
 
     /**
-     * Menyimpan alat baru.
+     * FUNGSI: createAlat
+     * TUJUAN: Menambahkan inventaris alat baru. Memprioritaskan penyimpanan lokal terlebih dahulu 
+     * (Offline-First) agar aplikasi terasa instan, lalu mencoba mengirim ke server jika ada sinyal.
      *
-     * Cara kerja:
-     * - Menyimpan data ke database lokal terlebih dulu dengan status "pending create".
-     * - Menyimpan fotonya ke penyimpanan lokal.
-     * - Jika internet tersedia, mencoba langsung mengirimkannya ke server.
-     * - Jika tidak ada internet, operasi tetap sukses dan akan dikirim di lain waktu.
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Menghasilkan ID (UUID) acak dari perangkat secara mandiri.
+     * 2. Membuat `AlatEntity` baru dengan tanda (flag) `sync_status = "pending"` dan `pending_action = "create"`.
+     * 3. Menyimpan ke database Room (SQLite) lokal.
+     * 4. Menyimpan fotonya ke penyimpanan lokal melalui `MediaRepository`.
+     * 5. Jika sedang *Online*, aplikasi secara agresif akan langsung memicu fungsi `syncPendingData()` 
+     *    agar alat baru ini dikirim ke server.
+     * 6. Jika *Offline*, fungsi tetap sukses. Pengguna dapat langsung melihat alat baru ini 
+     *    di layar mereka seolah-olah sudah terkirim.
      */
     suspend fun createAlat(name: String, category: String, totalQty: Int, condition: String, imagePath: String?) {
         // Karena belum dikirim ke server, buat ID lokal secara acak
@@ -178,10 +191,17 @@ class AlatRepository(
     }
 
     /**
-     * Memperbarui informasi alat yang sudah ada.
+     * FUNGSI: updateAlat
+     * TUJUAN: Mengubah detail barang inventaris.
      *
-     * Jika alat yang diupdate asalnya masih "pending create", statusnya tetap "create",
-     * tetapi nilainya diperbarui. Jika asalnya dari server, status diubah menjadi "pending update".
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Sama seperti `createAlat`, ia menimpa data di database lokal terlebih dahulu.
+     * 2. Terdapat logika unik untuk `pending_action`:
+     *    - Bila barang yang diedit dulunya baru dibuat saat offline (`pending_action == "create"`),
+     *      status tidak boleh diubah ke `update`, karena server butuh tahu bahwa ini barang baru (`create`).
+     *    - Bila barang berasal dari server yang sudah resmi (`synced`), ubah tanda jadi `update`.
+     * 3. Simpan perubahan gambar ke `MediaRepository` jika gambar juga diubah.
+     * 4. Jika sedang ada internet, coba paksa sinkronisasi langsung (`syncPendingData`).
      */
     suspend fun updateAlat(alat: AlatEntity, request: CreateAlatRequest) {
         val updated = alat.copy(
@@ -220,11 +240,21 @@ class AlatRepository(
     }
 
     /**
-     * Menghapus alat.
+     * FUNGSI: deleteAlat
+     * TUJUAN: Menghapus alat dengan dukungan *Soft-Delete* saat Offline.
      *
-     * Menangani kondisi "soft delete": alih-alih menghapus data sepenuhnya,
-     * alat ditandai 'delete'. Ini memastikan aplikasi ingat untuk menghapus alat ini
-     * di server saat koneksi internet kembali.
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Mencari barang di database lokal SQLite.
+     * 2. Ada 2 kasus penghapusan:
+     *    - KASUS A (Barang Mentah): Jika alat ini punya status `pending_action == "create"`, 
+     *      artinya barang ini DIBUAT secara offline dan belum pernah masuk server. 
+     *      Kita bisa langsung menghapusnya secara permanen dari database lokal. Server tak perlu tahu.
+     *    - KASUS B (Barang Resmi): Jika alat ini berasal dari server, kita TIDAK BOLEH 
+     *      langsung menghapusnya dari database lokal. Kita hanya menempelkan tanda (flag) 
+     *      `pending_action = "delete"`.
+     * 3. Jika sedang Online, `syncPendingData()` dipanggil. Worker/Tukang Pos ini akan 
+     *    membaca tanda "delete" tadi dan menyuruh server memusnahkan barang tersebut, barulah 
+     *    data lokal dihapus bersih.
      */
     suspend fun deleteAlat(id: String) {
         val existing = dao.getAlatById(id)
@@ -262,13 +292,24 @@ class AlatRepository(
     }
 
     /**
-     * Menjalankan seluruh proses sinkronisasi antrean tugas offline (pending_action).
+     * FUNGSI: syncPendingData
+     * TUJUAN: Berfungsi sebagai "Tukang Pos" yang mengantarkan semua pesan/tugas 
+     * tertunda (Offline) ke server secara terurut.
      *
-     * Berfungsi mirip "tukang pos" yang mengantarkan pesan tertunda saat jalan internet terbuka.
-     * Akan membaca tabel SQLite, mencari yang statusnya "pending", dan mengeksekusi
-     * create/update/delete ke API server satu per satu.
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Penguncian Mutex: Menggunakan `syncMutex.withLock` untuk memastikan tidak ada 
+     *    dua pengiriman data di waktu yang bersamaan (menghindari data terduplikasi).
+     * 2. Menarik seluruh tabel SQLite yang berstatus "pending".
+     * 3. Menjalin perulangan (Looping) satu per satu. Ia mengecek `pending_action`:
+     *    - Jika `"create"` -> Panggil rute `POST /alat`. Jika sukses, hapus ID acak lokal, 
+     *      gantikan dengan ID resmi dari server, lalu perbarui tabel Gambar.
+     *    - Jika `"update"` -> Panggil rute `PUT /alat/{id}`. Jika sukses, hapus tanda pending.
+     *    - Jika `"delete"` -> Panggil rute `DELETE /alat/{id}`. Jika sukses, buang bersih dari lokal.
+     * 4. Jika ada internet putus di tengah jalan, proses akan berhenti (`allSuccess = false`),
+     *    dan membiarkan sisa tugas tertunda diselesaikan nanti saat internet normal lagi.
+     * 5. Di akhir, ia juga menyuruh `MediaRepository` untuk menyinkronkan foto-foto alat.
      *
-     * @return true jika semua tugas sukses terkirim, false jika ada satu/lebih yang gagal
+     * @return boolean `true` jika semua tugas keranjang berhasil kosong, `false` jika ada yang tersangkut.
      */
     suspend fun syncPendingData(): Boolean {
         // syncMutex.withLock memastikan bahwa fungsi ini tidak dijalankan bersamaan

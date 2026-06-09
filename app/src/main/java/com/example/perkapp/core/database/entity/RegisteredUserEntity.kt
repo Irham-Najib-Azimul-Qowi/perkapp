@@ -4,11 +4,13 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * RegisteredUserEntity — Merepresentasikan tabel 'registered_users'.
+ * RegisteredUserEntity — Struktur Data Direktori Akun (Buku Telepon Pengguna).
  *
- * Menyimpan data *semua* pengguna yang pernah didaftarkan ke sistem.
- * Tabel ini beda dengan 'users'. Tabel 'users' cuma untuk 1 orang (yang sedang login).
- * Tabel ini untuk banyak orang, fungsinya sebagai daftar nama "Peminjam" alat.
+ * MENGAPA TABEL INI ADA?
+ * Saat Admin/Member membuat laporan peminjaman, mereka harus memilih "Siapa nama peminjamnya?".
+ * Agar tidak salah ketik, aplikasi butuh daftar *Dropdown* berisi nama semua mahasiswa/dosen.
+ * Tabel inilah yang menyimpan daftar nama-nama tersebut. Ia bertindak seperti 
+ * buku kontak lokal di dalam HP.
  */
 @Entity(tableName = "registered_users")
 data class RegisteredUserEntity(

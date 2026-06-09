@@ -1,3 +1,25 @@
+/**
+ * File: Color.kt
+ *
+ * FUNGSI UTAMA:
+ * File ini mendefinisikan seluruh palet warna (color palette) aplikasi Perkapp
+ * sesuai dengan UI Style Guide yang telah ditentukan.
+ *
+ * PENJELASAN MENDALAM:
+ * Warna-warna ini diorganisasikan ke dalam beberapa kelompok semantik:
+ * - Primary (Hijau utama): Warna dominan untuk tombol, header, dan elemen interaktif utama
+ * - Secondary (Hijau gelap): Warna pendukung untuk elemen sekunder
+ * - Tertiary (Coral/Salmon): Warna aksen untuk elemen yang perlu menonjol
+ * - Neutral (Dark Blue Gray): Warna netral untuk teks dan background
+ * - Status Colors: Warna untuk indikator sukses, peringatan, error, dan info
+ *
+ * Warna-warna ini akan dipasangkan ke dalam MaterialTheme (lihat Theme.kt)
+ * sehingga komponen Material 3 otomatis menggunakan warna yang konsisten.
+ *
+ * PERAN DALAM ARSITEKTUR:
+ * Color.kt → digunakan oleh Theme.kt (lightColorScheme) → diterapkan via MaterialTheme
+ * → seluruh komponen UI secara otomatis memakai warna dari skema ini
+ */
 package com.example.perkapp.core.ui.theme
 
 import androidx.compose.ui.graphics.Color

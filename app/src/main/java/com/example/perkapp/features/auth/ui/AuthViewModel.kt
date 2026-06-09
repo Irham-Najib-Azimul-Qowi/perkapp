@@ -68,22 +68,30 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     /**
-     * Memproses permintaan login dari user.
+     * FUNGSI: login
+     * TUJUAN: Menangani seluruh alur kejadian ketika pengguna mengeklik tombol "Login".
      *
-     * Alur kerja:
-     * 1. Validasi input → jika kosong, kirim state Error dan berhenti
-     * 2. Ubah state ke Loading → UI menampilkan loading indicator
-     * 3. Panggil repository.login() → mengirim request ke server
-     * 4. Jika sukses → ubah state ke Success → UI navigasi ke Home
-     * 5. Jika gagal → identifikasi jenis error → ubah state ke Error dengan pesan
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Validasi Pra-Syarat: Mengecek apakah kolom Email dan Password kosong. 
+     *    Jika iya, langsung *return Error* (menghemat kuota internet dan tenaga server).
+     * 2. Persiapan UI: Mengubah status `_loginState` menjadi `Loading`. Hal ini akan 
+     *    otomatis dibaca oleh `LoginScreen` untuk memunculkan animasi berputar (Spinner) 
+     *    dan menonaktifkan tombol sementara waktu.
+     * 3. Delegasi Tugas: Menyerahkan eksekusi berat kepada `AuthRepository.login()` 
+     *    yang berjalan di *Background Thread*.
+     * 4. Evaluasi Hasil (Sukses): Jika tidak ada error programatik, ia mengecek status boolean dari server.
+     *    Jika `true`, maka perbarui status ke `Success` (berpindah halaman).
+     *    Jika `false` (misal kata sandi salah), ubah status ke `Error`.
+     * 5. Penanganan Pengecualian (*Exception*): Bila server mati atau internet putus (`UnknownHostException`),
+     *    pesan error akan diubah menjadi bahasa Indonesia yang ramah pengguna.
      *
-     * @param request — Objek berisi email dan password yang diketik user
+     * @param request Bungkusan `Email` dan `Password`.
      */
     fun login(request: LoginRequest) {
         // Validasi dilakukan SEBELUM mengirim ke server untuk menghemat bandwidth
         if (request.email.isBlank() && request.password.isBlank()) {
             _loginState.value = AuthState.Error("Email dan Password tidak boleh kosong.")
-            return // Hentikan fungsi di sini, tidak perlu lanjut
+            return
         } else if (request.email.isBlank()) {
             _loginState.value = AuthState.Error("Email tidak boleh kosong.")
             return
@@ -100,27 +108,23 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
             // Delegasikan proses login ke Repository
             val result = repository.login(request)
             
-            // onSuccess: dipanggil jika API merespon tanpa Exception (meski bisa jadi error dari sisi logika server)
+            // onSuccess: dipanggil jika API merespon tanpa Exception
             result.onSuccess { response ->
                 if (response.success) {
-                    // Server mengkonfirmasi login berhasil
                     _loginState.value = AuthState.Success
                 } else {
-                    // Server merespons tapi menolak login (misal: akun salah)
                     _loginState.value = AuthState.Error(response.message)
                 }
             }.onFailure { exception ->
                 // onFailure: dipanggil jika ada Exception (koneksi putus, server mati, dll)
                 val errorMsg = when {
-                    // Masalah koneksi internet atau server tidak bisa dijangkau
                     exception is java.net.UnknownHostException || exception is java.net.ConnectException -> {
                         "Gagal terhubung ke server. Periksa koneksi internet Anda."
                     }
-                    // Server merespons tapi dengan kode status HTTP error (4xx, 5xx)
                     exception is retrofit2.HttpException -> {
                         when (exception.code()) {
-                            401 -> "Email atau password salah." // Unauthorized
-                            422 -> "Format email atau password tidak valid." // Unprocessable Entity
+                            401 -> "Email atau password salah."
+                            422 -> "Format email atau password tidak valid."
                             else -> "Gagal melakukan login. Silakan periksa kembali akun Anda."
                         }
                     }
@@ -134,12 +138,18 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     /**
-     * Memproses permintaan pendaftaran akun baru.
+     * FUNGSI: register
+     * TUJUAN: Menangani seluruh kejadian saat pengguna menekan tombol "Daftar".
      *
-     * Alurnya mirip dengan login, memvalidasi form lalu mengirimkan 
-     * data register ke server melalui Repository.
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Sama seperti fitur Login, jalankan validasi kelengkapan form secara luring (offline) terlebih dahulu.
+     * 2. Jika lolos, kirimkan objek request ke Repository.
+     * 3. Jika berhasil didaftarkan, Repository sudah merangkap fungsi "Auto Login",
+     *    sehingga `_registerState` langsung bernilai `Success`.
+     * 4. Jika gagal (misal email telah terpakai/HTTP 409), tangkap error dan 
+     *    tampilkan pop-up / tulisan merah di atas form lewat status `Error`.
      *
-     * @param request — Objek berisi nama, email, dan password untuk akun baru
+     * @param request Bungkusan Data Pendaftaran (Username, Email, Password).
      */
     fun register(request: RegisterRequest) {
         // Validasi kelengkapan data
@@ -192,10 +202,11 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     /**
-     * Mengeluarkan pengguna dari sesi saat ini.
-     *
-     * Menghapus token dari lokal dan memperbarui status agar kembali
-     * menjadi belum login (mengarahkan ke LoginScreen).
+     * FUNGSI: logout
+     * TUJUAN: Menjadi pemicu (Trigger) dari tombol Keluar di layar Profil.
+     * Mengakhiri sesi pengguna dengan cara memanggil fungsi pembersih 
+     * di repositori utama. Karena menggunakan `viewModelScope.launch`,
+     * ia akan langsung beraksi tanpa mem-blokir proses klik tombol.
      */
     fun logout() {
         viewModelScope.launch {

@@ -1,3 +1,22 @@
+/**
+ * File: Theme.kt
+ *
+ * FUNGSI UTAMA:
+ * File ini mengonfigurasi tema visual (Theme) Material 3 untuk seluruh aplikasi Perkapp.
+ *
+ * PENJELASAN MENDALAM:
+ * Dalam Jetpack Compose, tema didefinisikan menggunakan MaterialTheme yang menerima:
+ * - colorScheme: Skema warna (dari Color.kt) yang diterapkan ke semua komponen Material
+ * - typography: Gaya tipografi/font (dari Type.kt) untuk konsistensi teks
+ * - content: Seluruh UI Composable yang dibungkus oleh tema ini
+ *
+ * Aplikasi ini hanya menggunakan LIGHT THEME (tanpa dark mode).
+ * Tema juga mengatur warna status bar agar sesuai dengan warna primary aplikasi.
+ *
+ * CARA KERJA:
+ * PerkappTheme dipanggil di MainActivity.kt → membungkus PerkappApp() →
+ * semua komponen di dalamnya otomatis menggunakan warna dan tipografi yang ditentukan.
+ */
 package com.example.perkapp.core.ui.theme
 
 import android.app.Activity
@@ -11,6 +30,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 // === LIGHT COLOR SCHEME (sesuai Style Guide) ===
+// Memetakan warna-warna dari Color.kt ke dalam slot warna Material 3
 private val PerkLightColorScheme = lightColorScheme(
     primary = PerkPrimary,
     onPrimary = Color.White,

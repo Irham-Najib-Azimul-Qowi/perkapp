@@ -1,3 +1,20 @@
+/**
+ * File: Type.kt
+ *
+ * FUNGSI UTAMA:
+ * File ini mengonfigurasi gaya tipografi (font) untuk seluruh aplikasi Perkapp.
+ *
+ * PENJELASAN MENDALAM:
+ * Menggunakan sistem Typography dari Material 3 yang membagi teks menjadi beberapa
+ * kategori: display, headline, title, body, dan label (masing-masing punya ukuran Large, Medium, Small).
+ * Di sini kita mendefinisikan pengaturan default (font family, ukuran teks, jarak antar baris,
+ * dan jarak antar huruf) untuk beberapa kategori utama, terutama 'bodyLarge' dan 'titleLarge'.
+ *
+ * CARA KERJA:
+ * Typography ini dipasang ke dalam PerkappTheme (di Theme.kt).
+ * Semua komponen teks (Text composable) di aplikasi secara default akan menggunakan
+ * gaya 'bodyLarge' jika tidak ditentukan lain.
+ */
 package com.example.perkapp.core.ui.theme
 
 import androidx.compose.material3.Typography

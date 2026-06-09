@@ -24,10 +24,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import java.util.Calendar
 
 /**
- * EditKegiatanScreen — Halaman untuk mengubah (mengedit) data kegiatan yang sudah ada.
+ * FUNGSI: EditKegiatanScreen
+ * TUJUAN: Halaman untuk mengubah (mengedit) data kegiatan yang sudah ada.
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Form otomatis terisi dengan data kegiatan sebelumnya (seperti judul, lokasi, dll).
- * Pengguna dapat mengubah info tersebut dan menyimpannya ke sistem.
+ * Pengguna dapat mengubah info tersebut dan menyimpannya ke sistem melalui ViewModel.
  *
  * @param kegiatanId ID kegiatan yang akan diedit
  * @param onBack Fungsi callback untuk kembali ke layar sebelumnya
@@ -43,45 +45,59 @@ fun EditKegiatanScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
+    // --- Variabel State Lokal (Form) ---
+    // Variabel ini menampung teks/inputan yang sedang diketik atau diubah oleh pengguna
     var judul by remember { mutableStateOf("") }
     var lokasi by remember { mutableStateOf("") }
     var tanggal by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("BERLANGSUNG") }
     var deskripsi by remember { mutableStateOf("") }
-    val daftarPeminjam = remember { mutableStateListOf<String>() }
-    var peminjamInput by remember { mutableStateOf("") }
+    val daftarPeminjam = remember { mutableStateListOf<String>() } // Daftar nama dalam bentuk array/list
+    var peminjamInput by remember { mutableStateOf("") } // Teks pencarian saat mengetik nama
     
-    var expandedStatus by remember { mutableStateOf(false) }
-    var dropdownTerbuka by remember { mutableStateOf(false) }
+    // Status apakah dropdown sedang terbuka atau tertutup
+    var expandedStatus by remember { mutableStateOf(false) } // Untuk status kegiatan
+    var dropdownTerbuka by remember { mutableStateOf(false) } // Untuk autocompletion peminjam
+    
+    // Menandai apakah data awal dari database sudah berhasil dimuat ke dalam kolom form
     var isLoaded by remember { mutableStateOf(false) }
 
     val statusOptions = listOf("BERLANGSUNG", "SELESAI")
 
-    // Find current activity
+    // Mencari data kegiatan (aktivitas) spesifik berdasarkan ID yang sedang diedit
     val aktivitas = remember(uiState.aktivitasList, kegiatanId) {
         uiState.aktivitasList.find { it.id == kegiatanId }
     }
 
+    // Saat layar pertama kali terbuka:
+    // Pastikan kita memiliki data kegiatan dan daftar pengguna terbaru untuk fungsi pencarian nama
     LaunchedEffect(kegiatanId) {
         viewModel.loadActivities()
         viewModel.fetchRegisteredUsers()
     }
 
+    // Saat data 'aktivitas' berhasil ditemukan dan form belum terisi:
+    // Pindahkan semua nilai dari database ke dalam variabel state form
     LaunchedEffect(aktivitas) {
         if (!isLoaded && aktivitas != null) {
             judul = aktivitas.judul
-            lokasi = aktivitas.deskripsi.replace("Lokasi: ", "")
+            lokasi = aktivitas.deskripsi.replace("Lokasi: ", "") // Ekstrak nilai lokasi saja
             tanggal = aktivitas.tanggal
+            
+            // Konversi tipe StatusAktivitas menjadi nilai string standar form
             status = when (aktivitas.status) {
                 StatusAktivitas.BERLANGSUNG -> "BERLANGSUNG"
                 StatusAktivitas.SELESAI -> "SELESAI"
                 StatusAktivitas.DRAFT -> "DRAFT"
             }
             deskripsi = aktivitas.realDeskripsi
+            
+            // Mengurai string daftar peminjam (misal: "Adam, Budi") ke dalam array Chips
             daftarPeminjam.clear()
             val names = aktivitas.peminjam.split(",").map { it.trim() }.filter { it.isNotBlank() }
             daftarPeminjam.addAll(names)
-            isLoaded = true
+            
+            isLoaded = true // Tandai form sudah terisi agar tidak tertimpa/reset ulang jika layar recompose
         }
     }
 
@@ -337,13 +353,17 @@ fun EditKegiatanScreen(
 
             Button(
                 onClick = {
+                    // Validasi mencegah penyimpanan jika ada kolom yang kosong (wajib diisi)
                     when {
                         judul.isBlank() -> Toast.makeText(context, "Nama Kegiatan tidak boleh kosong", Toast.LENGTH_SHORT).show()
                         lokasi.isBlank() -> Toast.makeText(context, "Lokasi tidak boleh kosong", Toast.LENGTH_SHORT).show()
                         tanggal.isBlank() -> Toast.makeText(context, "Tanggal tidak boleh kosong", Toast.LENGTH_SHORT).show()
                         daftarPeminjam.isEmpty() -> Toast.makeText(context, "Peminjam harus diisi minimal 1", Toast.LENGTH_SHORT).show()
                         else -> {
+                            // Menggabungkan kembali array nama peminjam menjadi satu string utuh yang dipisahkan koma
                             val peminjamString = daftarPeminjam.joinToString(", ")
+                            
+                            // Memanggil fungsi ViewModel untuk mengupdate data di database lokal dan server API
                             viewModel.updateKegiatan(
                                 id = kegiatanId,
                                 judul = judul,
@@ -354,8 +374,9 @@ fun EditKegiatanScreen(
                                 peminjam = peminjamString,
                                 deskripsi = deskripsi,
                                 onSuccess = {
+                                    // Callback jika berhasil di-update
                                     Toast.makeText(context, "Kegiatan berhasil diperbarui!", Toast.LENGTH_SHORT).show()
-                                    onBack()
+                                    onBack() // Kembali ke layar sebelumnya (Detail Kegiatan / Home)
                                 }
                             )
                         }

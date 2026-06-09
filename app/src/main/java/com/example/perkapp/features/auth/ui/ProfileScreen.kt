@@ -19,10 +19,19 @@ import com.example.perkapp.core.Injection
 import com.example.perkapp.core.utils.NetworkUtils
 
 /**
- * ProfileScreen — Halaman profil pengguna dan opsi Logout.
- *
- * Menampilkan nama dan role user (admin/user), serta status jaringan (online/offline).
- * Jika user adalah admin, akan ada tombol untuk masuk ke halaman Inventaris.
+ * FUNGSI: ProfileScreen
+ * TUJUAN: Menjadi dasbor mini bagi pengguna untuk melihat identitas dirinya, 
+ * peran (Role), status koneksi saat ini, serta pintu keluar (Logout).
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Mengambil State `currentUser` (Profil dari Room DB), `isOnlineState` (dari NetworkUtils),
+ *    serta `token` (dari DataStore) secara reaktif.
+ * 2. Menyusun tampilan profil dengan membedakan warna label (Primary/Secondary) 
+ *    bergantung pada Role (Admin vs Member).
+ * 3. Jika pengguna adalah Admin, layar akan menyuntikkan tombol ekstra 
+ *    "Inventaris Alat" yang tidak bisa dilihat oleh Member biasa.
+ * 4. Menyediakan tombol "Logout" yang jika ditekan akan membersihkan sesi.
+ *    Bila `token` terdeteksi kosong, layar memicu *Navigation Event* (`onLogoutSuccess`).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

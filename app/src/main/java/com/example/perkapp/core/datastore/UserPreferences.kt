@@ -29,17 +29,21 @@ class UserPreferences(private val dataStore: DataStore<Preferences>) {
     private val TOKEN_KEY = stringPreferencesKey("auth_token")
 
     /**
-     * Membaca Token.
-     * Menggunakan Flow agar aplikasinya "langsung bereaksi" kalau token ini 
-     * tiba-tiba berubah (misal otomatis pindah ke halaman Login kalau tokennya dihapus).
+     * FUNGSI/PROPERTI: getAuthToken
+     * TUJUAN: Membaca Token. Menggunakan Flow agar aplikasinya "langsung bereaksi" 
+     * kalau token ini tiba-tiba berubah (misal otomatis pindah ke halaman Login kalau tokennya terhapus).
+     * @return Flow dari token String, atau null jika belum ada token.
      */
     val getAuthToken: Flow<String?> = dataStore.data.map { preferences ->
         preferences[TOKEN_KEY]
     }
 
     /**
-     * Menyimpan Token secara permanen ke memori HP.
-     * Biasanya dipanggil tepat setelah server membalas dengan status "Login Sukses".
+     * FUNGSI: saveAuthToken
+     * TUJUAN: Menyimpan Token secara permanen ke memori HP menggunakan fitur enkripsi 
+     * DataStore. Biasanya dipanggil tepat setelah server merespons "Login Sukses" 
+     * dan memberikan string panjang (JWT token) yang menjadi tiket masuk di request berikutnya.
+     * @param token String kunci rahasia dari server.
      */
     suspend fun saveAuthToken(token: String) {
         dataStore.edit { preferences ->
@@ -48,9 +52,10 @@ class UserPreferences(private val dataStore: DataStore<Preferences>) {
     }
 
     /**
-     * Menghapus Token.
-     * Dipanggil saat pengguna klik tombol "Logout".
-     * Begitu dihapus, aplikasi tidak akan bisa mengakses data dari server.
+     * FUNGSI: clearToken
+     * TUJUAN: Menghapus Token. Dipanggil saat pengguna mengeklik tombol "Logout".
+     * Begitu dihapus, aplikasi memotong tali akses ke server, membuat sesi 
+     * habis secara total pada sisi *client*.
      */
     suspend fun clearToken() {
         dataStore.edit { preferences ->

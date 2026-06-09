@@ -57,10 +57,20 @@ import com.example.perkapp.core.utils.rememberAsyncImage
 import com.example.perkapp.features.alat.ui.viewmodel.AlatViewModel
 
 /**
- * DetailAlatScreen — Halaman untuk melihat rincian sebuah barang.
+ * FUNGSI: DetailAlatScreen
+ * TUJUAN: Menampilkan informasi selengkap-lengkapnya (Zoom-In) dari satu barang.
  *
- * Menampilkan foto besar, nama, kategori, jumlah total dan tersedia,
- * serta tombol untuk mengedit atau menghapus barang tersebut.
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Menggunakan `alatId` yang dilempar dari layar sebelumnya untuk memanggil 
+ *    `getAlatById(alatId)` ke ViewModel.
+ * 2. Memuat gambar alat secara asinkron (background) dengan fungsi utilitas kustom.
+ * 3. Menampilkan status sinkronisasi alat (Ikon Awan Biru = Aman di Server, 
+ *    Awan Coret Kuning = Belum Terkirim/Offline).
+ * 4. Merender rincian statistik (Stok Total, Tersedia, dan Kondisi).
+ * 5. Menyediakan dua pintu aksi:
+ *    - Tombol Edit: melempar user ke `EditAlatScreen`.
+ *    - Tombol Hapus: memunculkan `AlertDialog` konfirmasi terlebih dahulu sebelum 
+ *      mengeksekusi fungsi `onDeleteClick`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

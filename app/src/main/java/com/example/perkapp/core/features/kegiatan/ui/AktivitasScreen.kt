@@ -49,7 +49,15 @@ data class Aktivitas(
 )
 
 /**
- * Composable utama (Root Screen) untuk menampilkan daftar Aktivitas/Kegiatan secara keseluruhan.
+ * FUNGSI: AktivitasScreen
+ * TUJUAN: Composable utama (Root Screen) untuk menampilkan daftar Aktivitas/Kegiatan secara keseluruhan.
+ *
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Mengamati UI state dari ViewModel secara reaktif.
+ * 2. Menyediakan struktur dasar halaman Material 3 menggunakan Scaffold.
+ * 3. Menampilkan banner offline dengan animasi jika perangkat tidak terhubung internet.
+ * 4. Menyediakan kolom pencarian dan filter chip status.
+ * 5. Merender daftar kegiatan menggunakan `LazyColumn` secara efisien.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -307,7 +315,8 @@ private fun FilterChipItem(
 }
 
 /**
- * Card komponen visual representasi dari satu kegiatan aktivitas.
+ * FUNGSI: AktivitasCard
+ * TUJUAN: Card komponen visual representasi dari satu kegiatan aktivitas.
  */
 @Composable
 fun AktivitasCard(

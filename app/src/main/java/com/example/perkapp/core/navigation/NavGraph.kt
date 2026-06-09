@@ -38,6 +38,27 @@ import com.example.perkapp.features.kegiatan.ui.HomeViewModel
  * Mengatur layar apa yang harus ditampilkan berdasarkan rute saat ini.
  * Juga bertugas menyuntikkan (inject) ViewModel ke masing-masing layar.
  */
+/**
+ * FUNGSI: SetupNavGraph
+ * 
+ * TUJUAN:
+ * Memetakan seluruh rute layar (Screen) dalam aplikasi layaknya "Peta Jalan".
+ * Fungsi ini bertugas menerjemahkan string rute (contoh: "home", "login") 
+ * menjadi wujud antarmuka visual (`@Composable`) yang akan digambar di layar HP.
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Mendaftarkan `AlatViewModel` di tingkat *Activity* (Root Scope) agar state alat-alat
+ *    bisa dipakai bersama antara fitur Tambah Alat, Daftar Alat, dan Form Peminjaman Alat.
+ * 2. Membuat `NavHost` yang mendengarkan perubahan URL/rute dari `navController`.
+ * 3. Mengatur layar pembuka perdana (`startDestination`) jatuh pada `SplashScreen`.
+ * 4. Mendefinisikan setiap rute dengan blok `composable()`. Jika pengguna pindah ke "login",
+ *    Render `LoginScreen` dan injeksikan fungsi-fungsi navigasi tambahannya.
+ * 5. Menangani argumen dinamis (contoh: ID alat/kegiatan) menggunakan `navArgument` 
+ *    pada rute seperti detail atau edit.
+ * 
+ * @param navController Pengatur kemudi utama navigasi bawaan Compose.
+ * @param paddingValues Jarak (margin) dari elemen induk (biasanya `Scaffold`) agar UI tidak tertutup BottomBar.
+ */
 @Composable
 fun SetupNavGraph(
     navController: NavHostController,

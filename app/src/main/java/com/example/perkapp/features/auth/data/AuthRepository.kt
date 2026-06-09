@@ -31,10 +31,23 @@ class AuthRepository(
     private val userDao: UserDao
 ) {
     /**
-     * Memproses permintaan login, mencoba server online dulu lalu fallback ke database lokal.
-     *
-     * @param request Data email dan password dari user
-     * @return Hasil dari proses login (sukses beserta datanya atau gagal dengan error)
+     * FUNGSI: login
+     * TUJUAN: Memvalidasi kredensial pengguna, mencoba menembak server *online* terlebih dahulu, 
+     * lalu melempar ke strategi *offline* (database lokal) jika tidak ada koneksi.
+     * 
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Mengecek apakah ini login khusus "Admin Bypass" (hardcode), jika iya, langsung buatkan sesi admin.
+     * 2. Jika koneksi internet menyala, kirimkan permintaan ke API Laravel.
+     * 3. Jika API membalas Sukses:
+     *    - Simpan Token ke dalam DataStore (RAM/Penyimpanan).
+     *    - Simpan data profil pengguna ke tabel SQLite (Room) agar sesi bisa dipakai offline nanti.
+     * 4. Jika internet mati atau server tidak bisa diakses (*Timeout*), alihkan eksekusi (Fallback) 
+     *    ke blok *Catch*.
+     * 5. Blok Fallback: Mengecek tabel lokal SQLite (`loginUser`). Jika email dan password 
+     *    cocok dengan data yang pernah *cached*, izinkan masuk dan pasang Token Dummy.
+     * 
+     * @param request Data email dan kata sandi.
+     * @return `Result` bungkus kesuksesan/kegagalan login.
      */
     suspend fun login(request: LoginRequest): Result<ApiResponse<com.example.perkapp.features.auth.api.AuthDataResponse>> {
         // withContext(Dispatchers.IO) memindahkan proses ini ke background thread (thread IO)
@@ -166,10 +179,22 @@ class AuthRepository(
     }
 
     /**
-     * Memproses permintaan registrasi, mencoba online dulu lalu fallback offline.
-     *
-     * @param request Data pendaftaran (nama, email, password)
-     * @return Hasil dari proses pendaftaran
+     * FUNGSI: register
+     * TUJUAN: Mendaftarkan akun baru, dengan prioritas pertama dikirim ke server (Online), 
+     * dan cadangan disimpan di memori HP (Offline).
+     * 
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Sama seperti login, cek dulu keberadaan sinyal internet.
+     * 2. Jika Online, kirim bungkusan DTO (Data Transfer Object) ke Laravel.
+     * 3. Jika berhasil, server akan merespons sekaligus memberikan Token Login.
+     *    - Simpan token tersebut ke DataStore.
+     *    - Simpan profil akun yang baru dibuat ke dalam tabel `users`.
+     * 4. Jika Offline, aplikasi tetap mengizinkan pengguna "Mendaftar", tapi:
+     *    - Data hanya dicatat di Room Database (SQLite) dengan ID *Random UUID*.
+     *    - Nanti saat sinkronisasi aktif, data ini harus diputar ulang ke server.
+     * 
+     * @param request Data pendaftaran (nama, email, password, role).
+     * @return `Result` status keberhasilan mendaftar.
      */
     suspend fun register(request: RegisterRequest): Result<ApiResponse<com.example.perkapp.features.auth.api.AuthDataResponse>> {
         return withContext(Dispatchers.IO) {
@@ -240,7 +265,14 @@ class AuthRepository(
     }
 
     /**
-     * Menghapus semua sesi dan data pengguna lokal untuk proses logout.
+     * FUNGSI: logout
+     * TUJUAN: Menghapus jejak sesi pengguna dan "membakar" identitas loginnya dari perangkat.
+     * 
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Menjalankan perintah di *Thread Background* (IO) agar UI tak nge-lag.
+     * 2. Memanggil `clearToken()` pada `UserPreferences` untuk menghapus *Bearer Token* di DataStore.
+     * 3. Memanggil `clearUser()` pada `UserDao` untuk menghapus 1 baris eksklusif di tabel profil.
+     * Setelah ini, sistem reaktif Jetpack Compose otomatis akan menendang user ke layar Login.
      */
     suspend fun logout() {
         // Operasi database harus di thread IO
@@ -257,8 +289,20 @@ class AuthRepository(
     fun getCurrentUser() = userDao.getUser()
 
     /**
-     * Sinkronisasi data profil pengguna dengan server jika token masih valid.
-     * Dipanggil otomatis saat ViewModel inisialisasi untuk memastikan data lokal tidak usang.
+     * FUNGSI: refreshProfileIfNeeded
+     * TUJUAN: Menyelaraskan (sinkronisasi pasif) data profil yang tersimpan di HP 
+     * dengan kondisi terbaru di server Laravel. Ini ibarat mengecek: "Apakah sesi saya masih sah?"
+     * 
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Menarik token rahasia dari brankas (DataStore). Jika kosong, abaikan (belum login).
+     * 2. Jika online, tembak rute `/auth/me` untuk meminta profil baru.
+     * 3. Jika berhasil, timpa (Update) `UserEntity` di SQLite dengan data teranyar.
+     * 4. Jika server menjawab dengan Error 401 (Unauthorized), itu berarti:
+     *    - Token sudah kadaluwarsa (Expired) ATAU 
+     *    - Akun dihapus paksa oleh Admin dari website.
+     *    - Maka, segera paksa Logout otomatis secara lokal.
+     * 5. Jika gagal murni karena tidak ada internet (Offline), dan tabel SQLite ternyata kosong 
+     *    karena *Bug*, pancing (inject) profil bawaan sementara agar aplikasi tidak *Crash*.
      */
     suspend fun refreshProfileIfNeeded() {
         withContext(Dispatchers.IO) {

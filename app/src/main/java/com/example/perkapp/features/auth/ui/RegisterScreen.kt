@@ -16,10 +16,17 @@ import com.example.perkapp.core.Injection
 import com.example.perkapp.features.auth.api.RegisterRequest
 
 /**
- * RegisterScreen — Halaman untuk membuat akun baru.
- *
- * Strukturnya sangat mirip dengan LoginScreen, bedanya di sini butuh tambahan
- * nama/username untuk proses pendaftaran.
+ * FUNGSI: RegisterScreen
+ * TUJUAN: Menyediakan formulir visual bagi pengguna baru untuk mendaftarkan akun ke sistem.
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Menampilkan 3 kolom input: Username, Email, dan Password.
+ * 2. Melacak status (state) dari `_registerState` milik `AuthViewModel`.
+ * 3. Ketika tombol "Daftar" diklik, layar ini menyerahkan ketiga teks tersebut 
+ *    ke dalam fungsi `register()` di ViewModel.
+ * 4. Animasi *Loading* dimainkan selama proses jaringan berlangsung.
+ * 5. Jika sukses didaftarkan dan login otomatis, `LaunchedEffect` akan 
+ *    memicu `onRegisterSuccess` untuk kembali ke halaman sebelumnya atau pindah ke Home.
  */
 @Composable
 fun RegisterScreen(

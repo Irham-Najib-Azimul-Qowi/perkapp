@@ -22,7 +22,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
- * HomeViewModel bertindak sebagai jembatan antara repositori data dan antarmuka pengguna (HomeScreen).
+ * FUNGSI: HomeViewModel
+ * TUJUAN: Bertindak sebagai jembatan antara repositori data dan antarmuka pengguna (HomeScreen).
  * ViewModel bertanggung jawab mempertahankan status (state) UI agar tidak hilang saat rotasi layar.
  */
 class HomeViewModel(
@@ -42,7 +43,8 @@ class HomeViewModel(
     }
 
     /**
-     * Mengambil seluruh data kebutuhan halaman Home secara paralel agar waktu respons cepat.
+     * FUNGSI: muatDataHome
+     * TUJUAN: Mengambil seluruh data kebutuhan halaman Home secara paralel agar waktu respons cepat.
      */
     fun muatDataHome() {
         // Meluncurkan coroutine di dalam lingkup daur hidup ViewModel
@@ -109,7 +111,8 @@ class HomeViewModel(
     }
 
     /**
-     * Membuat objek representasi state awal sewaktu data belum berhasil dimuat.
+     * FUNGSI: buatStateAwal
+     * TUJUAN: Membuat objek representasi state awal sewaktu data belum berhasil dimuat.
      */
     private fun buatStateAwal(): HomeUiState {
         return HomeUiState(

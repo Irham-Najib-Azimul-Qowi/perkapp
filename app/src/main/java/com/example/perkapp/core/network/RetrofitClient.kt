@@ -36,23 +36,29 @@ object RetrofitClient {
     }
 
     /**
-     * Membuat pencegat (Interceptor) yang otomatis menempelkan "Surat Izin" (Token).
+     * FUNGSI: getAuthInterceptor
+     * TUJUAN: Membuat "petugas bea cukai" (Interceptor) yang akan merazia dan menempelkan 
+     * surat izin (Token JWT) ke setiap paket data HTTP sebelum meluncur ke internet.
+     * Ia akan mencari token di beberapa tempat:
+     * 1. Variabel Global RAM (`authToken`).
+     * 2. Parameter `UserPreferences` jika disuntikkan secara eksplisit.
+     * 3. Parameter `Context` jika ada, untuk membuat instance DataStore baru.
      * 
-     * Saat kita minta data ke server, server akan bertanya "Kamu siapa?".
-     * Interceptor ini menyelipkan Header 'Authorization: Bearer <token>' 
-     * ke semua request agar server mengizinkan akses.
+     * @param userPreferences Pilihan tempat baca token pertama.
+     * @param context Pilihan tempat baca token kedua.
+     * @return Objek Interceptor yang siap dipasang ke OkHttp.
      */
     fun getAuthInterceptor(userPreferences: UserPreferences? = null, context: Context? = null): Interceptor {
         return Interceptor { chain ->
             // Siapkan paket data yang mau dikirim
             val request = chain.request().newBuilder()
-                .addHeader("Accept", "application/json") // Minta balasan berupa format JSON
+                .addHeader("Accept", "application/json") // Minta balasan berupa format JSON agar tidak di-redirect ke halaman web HTML
             
             var token = authToken
             
             // Mencari token dari sistem penyimpanan lokal (DataStore)
             if (userPreferences != null) {
-                // runBlocking memaksa fungsi asynchronous berjalan sinkron agar Interceptor tidak error
+                // runBlocking memaksa fungsi asynchronous berjalan sinkron agar OkHttp tidak terhenti karena menunggu coroutine
                 val flowToken = runBlocking { userPreferences.getAuthToken.first() }
                 if (!flowToken.isNullOrBlank()) {
                     token = flowToken
@@ -75,8 +81,12 @@ object RetrofitClient {
     }
 
     /**
-     * Instance Retrofit bawaan (Default) yang dipakai secara luas di aplikasi.
-     * lazy berarti: baru akan diciptakan saat pertama kali dipanggil (menghemat memori).
+     * PROPERTI: instance
+     * TUJUAN: Menyiapkan klien HTTP dan Retrofit (alat parsing) utama secara global.
+     * Memakai kata kunci `by lazy` sehingga ia tidak akan memakan RAM sebelum 
+     * baris kodenya benar-benar dipanggil. Klien ini sudah dikemas lengkap dengan 
+     * sistem logging (untuk melihat balasan server di Logcat Android Studio) 
+     * dan injeksi token otomatis mengambil konteks aplikasi global (`PerkappApplication.instance`).
      */
     val instance: Retrofit by lazy {
         val client = OkHttpClient.Builder()
@@ -86,7 +96,7 @@ object RetrofitClient {
                 
                 var token = authToken
                 try {
-                    // Mengambil context secara global
+                    // Mengambil context secara global agar tidak kerepotan passing Context
                     val context = com.example.perkapp.PerkappApplication.instance
                     val prefs = UserPreferences(context.dataStore)
                     val flowToken = runBlocking { prefs.getAuthToken.first() }
@@ -108,13 +118,19 @@ object RetrofitClient {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(client) // Pasang pengaturan klien HTTP tadi
-            .addConverterFactory(GsonConverterFactory.create()) // Pengonversi JSON otomatis
+            .addConverterFactory(GsonConverterFactory.create()) // Pengonversi teks JSON dari server ke dalam bentuk objek/Class Kotlin
             .build()
     }
 
     /**
-     * Method pembuat Retrofit Client yang lebih spesifik (Biasanya dipakai di fitur Auth).
-     * Menerima UserPreferences sebagai parameter yang dikirim via Dependency Injection (DI).
+     * FUNGSI: getClient
+     * TUJUAN: Sebuah pabrik (Factory) untuk menciptakan objek Retrofit baru yang secara
+     * spesifik menggunakan `UserPreferences` tertentu (biasanya disediakan lewat Hilt DI).
+     * Metode ini memastikan fitur seperti Autentikasi (AuthRepository) memiliki pengontrol 
+     * sesi yang ketat dan tidak bercampur.
+     * 
+     * @param userPreferences Kelas DataStore tempat token disembunyikan.
+     * @return Objek Retrofit yang sudah dipersenjatai Interceptor dan Logger.
      */
     fun getClient(userPreferences: UserPreferences): Retrofit {
         val client = OkHttpClient.Builder()
@@ -130,8 +146,21 @@ object RetrofitClient {
     }
 
     /**
-     * Melakukan silent auto-login di latar belakang untuk mendapatkan token JWT.
-     * Digunakan sebagai solusi sementara atau untuk testing saat token kadaluwarsa.
+     * FUNGSI: performSilentLogin
+     * TUJUAN: Menjalankan *script* Login di balik layar tanpa sepengetahuan antarmuka pengguna (UI).
+     * Sering digunakan sebagai trik pemulihan (Recovery) saat sinkronisasi gagal karena JWT token hangus.
+     * Menggunakan kredensial "Admin Default" sebagai contoh implementasi di mode testing/development.
+     * 
+     * ALUR LOGIKA:
+     * 1. Menyiapkan bungkusan JSON berisi email & password (Hardcoded untuk tahap dev).
+     * 2. Menembakkan permintaan POST murni (tanpa Retrofit) ke rute `/auth/login`.
+     * 3. Jika jawaban HTTP adalah kode 2xx (Sukses), ia akan membedah teks balasan 
+     *    untuk menarik keluar string `token`.
+     * 4. Menyimpan token baru itu ke dalam variabel `authToken` (RAM) 
+     *    dan `UserPreferences` (Penyimpanan Fisik).
+     * 
+     * @param context Konteks aplikasi untuk bisa membuka brankas DataStore.
+     * @return True bila login gaib ini berhasil, False bila gagal (misal server mati).
      */
     suspend fun performSilentLogin(context: Context): Boolean {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

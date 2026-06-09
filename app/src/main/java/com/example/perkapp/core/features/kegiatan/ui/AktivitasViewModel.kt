@@ -1,3 +1,19 @@
+/**
+ * FUNGSI: AktivitasViewModel
+ * TUJUAN: Berperan sebagai State Holder dan otak logika untuk semua layar yang berhubungan dengan
+ * fitur Kegiatan/Aktivitas (misal: AktivitasScreen, DetailKegiatanScreen, dll).
+ *
+ * ALUR LOGIKA PENGERJAAN:
+ * ViewModel ini mengelola state UI (`AktivitasUiState`) menggunakan `StateFlow`.
+ * Tugas utamanya meliputi:
+ * 1. Memuat daftar kegiatan dari repository (lokal/Room).
+ * 2. Melakukan filter/pencarian daftar kegiatan.
+ * 3. Mengelola sinkronisasi data kegiatan antara server (API) dan database lokal (Room).
+ * 4. Menyimpan data sementara yang dibutuhkan UI seperti `currentDetailAlatList`.
+ *
+ * `@HiltViewModel` menandakan bahwa instance kelas ini bisa di-inject otomatis
+ * oleh Hilt, lengkap dengan parameter yang dibutuhkan (`KegiatanRepository`).
+ */
 package com.example.perkapp.core.features.kegiatan.ui
 
 import androidx.lifecycle.ViewModel
@@ -116,6 +132,11 @@ class AktivitasViewModel @Inject constructor(
         }
     }
 
+    /**
+     * FUNGSI: loadActivities
+     * TUJUAN: Mengambil daftar riwayat kegiatan dari database lokal (Room) lalu memetakannya
+     * ke dalam kelas data UI (`Aktivitas`) sebelum dilempar ke `StateFlow`.
+     */
     fun loadActivities() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -186,6 +207,10 @@ class AktivitasViewModel @Inject constructor(
         }
     }
 
+    /**
+     * FUNGSI: insertKegiatan
+     * TUJUAN: Meracik semua inputan form Tambah Kegiatan untuk dikirim ke Repository agar disimpan/disinkronkan.
+     */
     fun insertKegiatan(
         judul: String,
         kategori: String,

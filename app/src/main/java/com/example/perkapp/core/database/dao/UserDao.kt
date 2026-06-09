@@ -16,22 +16,44 @@ import kotlinx.coroutines.flow.Flow
 // @Dao: memberitahu Room bahwa interface ini adalah Data Access Object
 @Dao
 interface UserDao {
-    // Menyimpan data user ke database lokal
-    // OnConflictStrategy.REPLACE: timpa data lama jika sudah ada user dengan ID yang sama
+    /**
+     * FUNGSI: insertUser
+     * TUJUAN: Mencatat dan menyimpan data profil pengguna yang berhasil login ke database lokal.
+     * Berkat argumen `OnConflictStrategy.REPLACE`, jika sudah ada akun sebelumnya,
+     * akun tersebut akan tergantikan oleh profil yang baru.
+     * @param user Model data berisi ID, nama, dan email pengguna.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUser(user: UserEntity)
 
-    // Mengambil data user yang sedang login
-    // Pakai Flow agar ViewModel otomatis mendapat update jika isi tabel ini berubah
-    // LIMIT 1 memastikan hanya ada 1 akun yang aktif pada satu waktu
+    /**
+     * FUNGSI: getUser
+     * TUJUAN: Mengambil rekam profil pengguna yang sedang beroperasi saat ini.
+     * Mengembalikan `Flow` artinya fungsi ini memantau secara langsung (*real-time*). 
+     * Kapan pun data di tabel `users` berubah, nilai baru otomatis dipancarkan ke komponen UI.
+     * `LIMIT 1` menegaskan bahwa aplikasi ini dirancang *single-account* per sesi.
+     * @return Flow dari UserEntity, atau null jika belum ada user (logout).
+     */
     @Query("SELECT * FROM users LIMIT 1")
     fun getUser(): Flow<UserEntity?>
 
-    // Mencocokkan email/username dan password untuk login saat offline
+    /**
+     * FUNGSI: loginUser
+     * TUJUAN: Melakukan pengecekan kredensial (login) secara *offline*. 
+     * Berguna jika user ingin masuk aplikasi tapi tidak ada sinyal internet,
+     * aplikasi bisa mencocokkan inputan dengan sandi terakhir yang terekam di HP.
+     * @param email Inputan dari field email (atau username).
+     * @param password Inputan kata sandi.
+     * @return Entitas pengguna bila email & sandi cocok, atau null jika salah.
+     */
     @Query("SELECT * FROM users WHERE (email = :email OR name = :email) AND password = :password LIMIT 1")
     suspend fun loginUser(email: String, password: String): UserEntity?
 
-    // Menghapus data user lokal (dipanggil saat logout)
+    /**
+     * FUNGSI: clearUser
+     * TUJUAN: Membersihkan sesi profil pengguna dari lokal saat proses Logout.
+     * Begitu tabel kosong, `Flow` dari getUser() akan menginfokan UI untuk pindah ke layar Login.
+     */
     @Query("DELETE FROM users")
     suspend fun clearUser()
 }

@@ -16,10 +16,17 @@ import com.example.perkapp.core.Injection
 import com.example.perkapp.features.auth.api.LoginRequest
 
 /**
- * LoginScreen — Halaman untuk masuk (login) ke dalam aplikasi.
- *
- * Di sini user menginput Email dan Password. Jika berhasil, akan dilempar ke Home.
- * Jika salah, akan muncul pesan error (misal: "Email salah" atau "Password salah").
+ * FUNGSI: LoginScreen
+ * TUJUAN: Menyediakan antarmuka visual (UI) bagi pengguna untuk memasukkan kredensial 
+ * (Email dan Password) guna memverifikasi identitas mereka.
+ * 
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Layar ini "berlangganan" (subscribe) ke `loginState` milik `AuthViewModel`.
+ * 2. Ia mengumpulkan teks dari dua kolom input (`OutlinedTextField`).
+ * 3. Ketika tombol Login diklik, nilai dari kedua kolom diserahkan ke ViewModel.
+ * 4. Jika ViewModel mengubah status menjadi `Loading`, tombol di-disable dan Spinner berputar.
+ * 5. Jika ViewModel mengubah status menjadi `Success`, *LaunchedEffect* terpanggil dan 
+ *    menjalankan fungsi `onLoginSuccess` (pindah halaman).
  */
 @Composable
 fun LoginScreen(

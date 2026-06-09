@@ -41,8 +41,10 @@ data class DetailToolState(
 )
 
 /**
- * DetailKegiatanScreen — Halaman untuk melihat informasi lengkap suatu kegiatan.
+ * FUNGSI: DetailKegiatanScreen
+ * TUJUAN: Halaman untuk melihat informasi lengkap suatu kegiatan.
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Di layar ini, pengguna bisa melihat rincian kegiatan seperti tanggal, peminjam,
  * lokasi, dan daftar alat yang sedang dipakai. Terdapat juga fitur absensi pengembalian
  * (menandai alat sudah dikembalikan), serta tombol Edit dan Hapus (jika memiliki hak akses).
@@ -67,7 +69,8 @@ fun DetailKegiatanScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentUserInfo by viewModel.currentUserInfo.collectAsState()
 
-    // Normalize IDs (e.g. 101 -> 1, 102 -> 2, 103 -> 3)
+    // Menormalkan ID kegiatan (menghapus prefix tertentu jika ada, misal '101' menjadi '1') 
+    // Ini memastikan pencocokan yang tepat antara ID lokal Room dan ID dari server API
     val normalizedId = remember(kegiatanId) {
         if (kegiatanId.startsWith("10") && kegiatanId.length > 2) {
             kegiatanId.substring(2)
@@ -76,6 +79,8 @@ fun DetailKegiatanScreen(
         }
     }
 
+    // Pemicu awal saat layar dibuka: memuat data kegiatan terbaru, 
+    // daftar alat yang terkait dengan kegiatan ini, dan info profil user saat ini
     LaunchedEffect(kegiatanId) {
         viewModel.loadActivities()
         viewModel.loadAlatForKegiatan(kegiatanId)
@@ -88,37 +93,47 @@ fun DetailKegiatanScreen(
 
     val toolList = uiState.currentDetailAlatList
 
-    // Access permissions logic
+    // --- Logika Hak Akses (Permissions) ---
     val currentUserName = currentUserInfo?.nama ?: ""
     val currentUserRole = currentUserInfo?.role ?: "member"
-    val isAdmin = currentUserRole.lowercase() == "admin"
+    val isAdmin = currentUserRole.lowercase() == "admin" // Cek apakah user adalah admin
     val currentUserId = currentUserInfo?.id ?: ""
+    
+    // Memecah teks daftar peminjam (yang dipisah koma) menjadi list/array terpisah untuk memudahkan pengecekan
     val peminjamList = remember(aktivitas?.peminjam) {
         aktivitas?.peminjam?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
     }
+    
+    // Menentukan apakah user saat ini berhak melihat, mengubah, atau menghapus kegiatan ini beserta alat-alatnya
+    // Hak akses diberikan JIKA: User adalah Admin, ATAU pembuat/pendaftar kegiatan ini, ATAU namanya tercantum sebagai peminjam
     val hasAccess = remember(isAdmin, peminjamList, currentUserName, aktivitas, currentUserId) {
         val isCreator = aktivitas?.createdBy != null && aktivitas.createdBy == currentUserId
         isAdmin || isCreator || peminjamList.any { it.equals(currentUserName, ignoreCase = true) }
     }
     
-    // Approval logic: admin can approve alat for member-created kegiatan
+    // --- Logika Persetujuan Alat (Approval) ---
+    // Khusus Admin: Mengecek apakah kegiatan ini (yang dibuat member) alat-alatnya masih menunggu persetujuan (approval)
     val needsApproval = remember(aktivitas, isAdmin) {
         aktivitas != null && isAdmin && aktivitas.alatApproved == false && !aktivitas.isPending
     }
+    // Status apakah alat-alat pada kegiatan ini sudah disetujui (Approved)
     val isApproved = aktivitas?.alatApproved ?: false
 
+    // Menampilkan popup dialog konfirmasi saat pengguna menekan tombol "Hapus"
     if (showDeleteDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { showDeleteDialog = false }, // Tutup dialog jika mengetuk area luar
             title = { Text("Hapus Kegiatan") },
             text = { Text("Apakah Anda yakin ingin menghapus kegiatan ini? Stok alat yang sedang dipinjam akan dikembalikan ke inventaris.") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
+                        // Menjalankan perintah hapus kegiatan melalui ViewModel
+                        // Ini juga akan secara otomatis mengembalikan stok alat ke inventaris (ditangani oleh logika Repository)
                         viewModel.deleteKegiatan(kegiatanId) {
                             Toast.makeText(context, "Kegiatan berhasil dihapus!", Toast.LENGTH_SHORT).show()
-                            onDeleteSuccess()
+                            onDeleteSuccess() // Callback pindah halaman (kembali ke layar sebelumnya)
                         }
                     }
                 ) {
@@ -479,7 +494,8 @@ fun DetailKegiatanScreen(
 }
 
 /**
- * DetailKegiatanToolCard — Komponen visual (kartu) untuk satu item alat di halaman Detail Kegiatan.
+ * FUNGSI: DetailKegiatanToolCard
+ * TUJUAN: Komponen visual (kartu) untuk satu item alat di halaman Detail Kegiatan.
  *
  * @param tool Data alat yang berisi nama, jumlah, dan status pengembalian
  * @param onClick Aksi ketika kartu alat ditekan (misal: untuk proses absensi/pengembalian)

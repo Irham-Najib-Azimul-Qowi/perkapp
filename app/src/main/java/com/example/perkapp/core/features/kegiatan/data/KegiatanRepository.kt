@@ -61,7 +61,8 @@ fun parseDescription(fullDesc: String?): ParsedDescription {
 }
 
 /**
- * KegiatanRepository — Antarmuka (Interface) untuk sumber data fitur Kegiatan.
+ * FUNGSI: KegiatanRepository
+ * TUJUAN: Antarmuka (Interface) untuk sumber data fitur Kegiatan.
  *
  * Mendefinisikan aturan dan fungsi apa saja yang bisa dipanggil oleh ViewModel
  * terkait kegiatan (peminjaman, event, dll).
@@ -103,8 +104,10 @@ interface KegiatanRepository {
 }
 
 /**
- * KegiatanRepositoryImpl — Implementasi nyata dari KegiatanRepository.
+ * FUNGSI: KegiatanRepositoryImpl
+ * TUJUAN: Implementasi nyata dari KegiatanRepository.
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Kelas ini menggabungkan dua sumber data utama:
  * 1. Remote (API server via Retrofit) — untuk sinkronisasi ke cloud
  * 2. Local (Room Database via DAO) — untuk offline-first (bisa dipakai tanpa internet)
@@ -184,15 +187,16 @@ class KegiatanRepositoryImpl(
     }
 
     /**
-     * Mengambil daftar kegiatan yang sedang aktif/berlangsung.
+     * FUNGSI: getKegiatanAktif
+     * TUJUAN: Mengambil daftar kegiatan yang sedang aktif/berlangsung.
      *
-     * Alur kerja:
-     * 1. Jika online, ambil data terbaru dari server (sync down)
-     * 2. Simpan/timpa data lokal dengan data server (kecuali yang statusnya pending/punya perubahan lokal)
-     * 3. Hapus kegiatan lokal jika di server sudah dihapus
-     * 4. Terakhir, selalu kembalikan daftar kegiatan dari database lokal
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Jika online, ambil data terbaru dari server (sync down).
+     * 2. Simpan/timpa data lokal dengan data server (kecuali yang statusnya pending/punya perubahan lokal).
+     * 3. Hapus kegiatan lokal jika di server sudah dihapus.
+     * 4. Terakhir, selalu kembalikan daftar kegiatan dari database lokal.
      *
-     * @return Daftar kegiatan dalam bentuk domain model (Kegiatan)
+     * @return Daftar kegiatan dalam bentuk domain model (Kegiatan).
      */
     override suspend fun getKegiatanAktif(): Result<List<Kegiatan>> {
         // Jika internet tersedia, ambil data dari server dulu agar data selalu up-to-date
@@ -375,15 +379,16 @@ class KegiatanRepositoryImpl(
     }
 
     /**
-     * Menambahkan kegiatan baru berserta daftar alat yang dipinjam.
+     * FUNGSI: insertKegiatanLocal
+     * TUJUAN: Menambahkan kegiatan baru berserta daftar alat yang dipinjam.
      *
-     * Alur kerja (Offline-first):
-     * 1. Buat ID acak lokal dan simpan kegiatan ke Room Database dengan status "pending create"
-     * 2. Simpan daftar alat (internal & eksternal) ke tabel kegiatan_alat dengan status "pending create"
-     * 3. Kurangi jumlah stok alat yang tersedia (available_qty) di tabel alat secara lokal
-     * 4. Jika sedang online, langsung coba kirim semua data ini ke server
+     * ALUR LOGIKA PENGERJAAN (Offline-first):
+     * 1. Buat ID acak lokal dan simpan kegiatan ke Room Database dengan status "pending create".
+     * 2. Simpan daftar alat (internal & eksternal) ke tabel `kegiatan_alat` dengan status "pending create".
+     * 3. Kurangi jumlah stok alat yang tersedia (`available_qty`) di tabel alat secara lokal.
+     * 4. Jika sedang online, langsung coba kirim semua data ini ke server.
      *
-     * @return ID dari kegiatan yang baru dibuat
+     * @return ID dari kegiatan yang baru dibuat.
      */
     override suspend fun insertKegiatanLocal(
         judul: String,
@@ -539,14 +544,14 @@ class KegiatanRepositoryImpl(
     }
 
     /**
-     * Memperbarui status peminjaman satu alat di dalam sebuah kegiatan.
-     *
+     * FUNGSI: updateKegiatanAlatStatusLocal
+     * TUJUAN: Memperbarui status peminjaman satu alat di dalam sebuah kegiatan.
      * Dipanggil saat user mencentang/menghapus centang "Dikembalikan" pada alat.
      *
-     * Alur kerja:
-     * 1. Ubah status 'isReturned' di database lokal menjadi true/false
-     * 2. Sesuaikan stok alat di tabel inventaris utama (tambah stok jika dikembalikan)
-     * 3. Jika online, langsung laporkan pembaruan ini ke server (masuk ke string deskripsi)
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Ubah status `isReturned` di database lokal menjadi true/false.
+     * 2. Sesuaikan stok alat di tabel inventaris utama (tambah stok jika dikembalikan).
+     * 3. Jika online, langsung laporkan pembaruan ini ke server (masuk ke string deskripsi).
      */
     override suspend fun updateKegiatanAlatStatusLocal(kegiatanAlatId: String, isReturned: Boolean) {
         val db = AppDatabase.getDatabase(context)
@@ -632,8 +637,10 @@ class KegiatanRepositoryImpl(
     }
 
     /**
-     * Mengeksekusi antrean perubahan (pending_action) untuk disinkronisasi ke server.
+     * FUNGSI: syncPendingKegiatan
+     * TUJUAN: Mengeksekusi antrean perubahan (pending_action) untuk disinkronisasi ke server.
      *
+     * ALUR LOGIKA PENGERJAAN:
      * "Tukang pos" ini akan mengecek tabel Kegiatan dan Kegiatan_Alat:
      * - "create" → Kirim POST untuk data baru
      * - "update" → Kirim PUT/PATCH untuk perubahan data

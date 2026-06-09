@@ -1,3 +1,18 @@
+/**
+ * FUNGSI: AlatCard
+ * TUJUAN: Komponen UI (Jetpack Compose) yang dapat digunakan ulang (Reusable) 
+ * untuk menampilkan satu kotak kartu barang/alat.
+ *
+ * ALUR LOGIKA PENGERJAAN:
+ * 1. Menerima objek `AlatEntity` dan mencetak rinciannya (Nama, Kategori, Stok, Kondisi).
+ * 2. Memuat gambar alat secara asinkron. Jika gagal atau kosong, kartu akan 
+ *    mencetak huruf inisial dari nama alat.
+ * 3. Memberikan umpan balik visual terkait status sinkronisasi alat:
+ *    - Hijau ("Terupload ke API Server") jika `sync_status == "synced"`.
+ *    - Kuning ("Tersimpan di Room Database") jika `sync_status == "pending"`.
+ * 4. Saat diklik, kartu ini memicu fungsi (Lambda) `onClick` agar layarnya 
+ *    tahu kartu mana yang dipilih pengguna (misal untuk navigasi ke Detail Alat).
+ */
 package com.example.perkapp.features.alat.ui.component
 
 import androidx.compose.foundation.Image
@@ -134,7 +149,7 @@ fun AlatCard(
                 Row{
                     Text(
                         text = "Stok: ${alat.available_qty}/${alat.total_qty}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typolgraphy.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 

@@ -4,11 +4,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * ImageEntity — Merepresentasikan tabel 'images'.
+ * FUNGSI: ImageEntity
+ * TUJUAN: Merepresentasikan tabel 'images' untuk menyimpan referensi gambar.
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Tabel ini sangat penting untuk offline-first. Saat kita memotret alat/kegiatan 
  * tanpa internet, aplikasi belum bisa mengunggah gambarnya (dapat URL).
- * 
  * Jadi, aplikasi akan menyimpan rute "lokal" ke file gambar (local_path).
  * Nanti kalau ada internet, baru diunggah untuk mendapatkan "image_url" dari server.
  */

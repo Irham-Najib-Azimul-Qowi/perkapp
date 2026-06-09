@@ -38,12 +38,43 @@ import com.example.perkapp.features.media.data.ImageEntity
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
-    // Setiap abstract fun di sini adalah "pintu masuk" ke satu tabel
-    // Room akan otomatis membuatkan implementasinya
+    /**
+     * FUNGSI: userDao
+     * TUJUAN: Menyediakan akses ke tabel 'users' untuk mengelola profil pengguna yang sedang login.
+     * @return UserDao yang berisi kumpulan kueri SQLite untuk entitas UserEntity.
+     */
     abstract fun userDao(): UserDao
+
+    /**
+     * FUNGSI: registeredUserDao
+     * TUJUAN: Menyediakan akses ke tabel 'registered_users' untuk membaca daftar semua akun terdaftar 
+     * di sistem (biasanya digunakan untuk dropdown pemilihan peminjam alat).
+     * @return RegisteredUserDao untuk entitas RegisteredUserEntity.
+     */
     abstract fun registeredUserDao(): RegisteredUserDao
+
+    /**
+     * FUNGSI: alatDao
+     * TUJUAN: Menyediakan akses ke tabel 'alat' untuk membaca, menambah, atau mengurangi 
+     * persediaan stok inventaris barang.
+     * @return AlatDao untuk entitas AlatEntity.
+     */
     abstract fun alatDao(): AlatDao
+
+    /**
+     * FUNGSI: imageDao
+     * TUJUAN: Menyediakan akses ke tabel 'images' untuk menyimpan antrean gambar 
+     * (foto barang) yang belum terunggah ke server saat offline.
+     * @return ImageDao untuk entitas ImageEntity.
+     */
     abstract fun imageDao(): ImageDao
+
+    /**
+     * FUNGSI: kegiatanDao
+     * TUJUAN: Menyediakan akses ke tabel 'kegiatan' dan 'kegiatan_alat' untuk mencatat
+     * riwayat acara dan barang apa saja yang dipinjam pada acara tersebut.
+     * @return KegiatanDao untuk entitas KegiatanEntity dan KegiatanAlatEntity.
+     */
     abstract fun kegiatanDao(): KegiatanDao
 
     companion object {

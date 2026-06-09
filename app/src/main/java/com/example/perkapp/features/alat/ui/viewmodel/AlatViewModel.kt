@@ -75,14 +75,16 @@ class AlatViewModel(
     }
 
     /**
-     * Mengambil daftar semua alat dari Repository.
+     * FUNGSI: getAllAlat
+     * TUJUAN: Menjadi pintu masuk data dari Repository ke UI (Layar).
      *
-     * Alur kerja:
-     * 1. Set loading jadi true
-     * 2. Jika online, coba sinkronisasi data pending terlebih dahulu
-     * 3. Minta data ke repository (repository akan mengatur apakah ambil dari lokal atau server)
-     * 4. Jika sukses, simpan hasilnya ke 'alatList' agar UI bisa menampilkannya
-     * 5. Jika gagal, tampilkan pesan error
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Mengubah `isLoading` menjadi true agar Spinner muncul di layar.
+     * 2. Jika internet hidup, secara agresif memaksa `repository.syncPendingData()`
+     *    untuk mengirim barang-barang yang masih nyangkut.
+     * 3. Meminta seluruh daftar alat (`getAllAlat`) dari Repository dan menampungnya ke `alatList`.
+     * 4. Jika koneksi putus (Error), tampilkan pesan "Gagal terhubung".
+     * 5. Pada blok `finally`, matikan efek Loading.
      */
     fun getAllAlat() {
         viewModelScope.launch {
@@ -114,13 +116,22 @@ class AlatViewModel(
     }
 
     /**
-     * Menambahkan alat baru ke inventaris.
+     * FUNGSI: createAlat
+     * TUJUAN: Menjadi jembatan ketika tombol "Simpan" ditekan di layar `TambahAlatScreen`.
      *
-     * @param name Nama alat
-     * @param category Kategori alat
-     * @param totalQty Jumlah total barang
-     * @param condition Kondisi alat
-     * @param imagePath Lokasi penyimpanan gambar (jika ada)
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Mencegah Dobel Klik: Cek `isLoading.value == true`, jika ya, batalkan aksi.
+     * 2. Nyalakan Loading.
+     * 3. Minta Repository membuatkan data.
+     * 4. Menjadwalkan WorkManager (`SyncManager.scheduleSyncWhenOnline()`) sebagai jaring 
+     *    pengaman jika proses sinkronisasi gagal di tengah jalan.
+     * 5. *Refresh* (Panggil `getAllAlat()`) agar alat yang baru terbuat langsung nongol di layar.
+     *
+     * @param name Nama barang.
+     * @param category Kategori barang.
+     * @param totalQty Jumlah awal.
+     * @param condition Kondisi (Baik/Rusak).
+     * @param imagePath Lokasi foto.
      */
     fun createAlat(name: String, category: String, totalQty: Int, condition: String, imagePath: String?) {
         // Cegah eksekusi ganda jika tombol diklik berkali-kali saat masih loading
@@ -150,10 +161,13 @@ class AlatViewModel(
     }
 
     /**
-     * Mengambil detail satu alat berdasarkan ID-nya.
-     * Hasilnya disimpan di 'selectedAlat' agar bisa dibaca oleh layar Detail atau Edit.
+     * FUNGSI: getAlatById
+     * TUJUAN: Menarik satu data spesifik dari gudang penyimpanan.
+     * Hasil pencarian akan ditaruh di keranjang `selectedAlat`.
+     * Layar `DetailAlatScreen` dan `EditAlatScreen` sudah berlangganan ke keranjang ini,
+     * sehingga saat datanya masuk, layarnya langsung merender informasi alat tersebut.
      *
-     * @param id ID unik alat yang ingin dicari
+     * @param id ID unik alat.
      */
     fun getAlatById(id: String) {
         viewModelScope.launch {
@@ -162,10 +176,11 @@ class AlatViewModel(
     }
 
     /**
-     * Memperbarui data alat yang sudah ada.
+     * FUNGSI: updateAlat
+     * TUJUAN: Mengeksekusi penyimpanan hasil edit (Ubah Alat).
      *
-     * @param alat Data lama alat sebelum diubah (AlatEntity)
-     * @param request Data baru hasil perubahan yang diisi user di form edit
+     * @param alat Objek data barang versi usang (Sebelum diedit).
+     * @param request Bungkusan data form yang baru diisi.
      */
     fun updateAlat(alat: AlatEntity, request: CreateAlatRequest) {
         viewModelScope.launch {
@@ -190,14 +205,19 @@ class AlatViewModel(
     }
 
     /**
-     * Menghapus alat dari inventaris.
+     * FUNGSI: deleteAlat
+     * TUJUAN: Menghapus alat dengan perlindungan ekstra.
      *
-     * Mengecek dulu ke database lokal, apakah alat ini sedang digunakan/dipinjam 
-     * oleh suatu kegiatan. Jika ya, penghapusan ditolak.
+     * ALUR LOGIKA PENGERJAAN:
+     * 1. Validasi Silang (Cross-Check): Sebelum menghapus, ia mengintip tabel `KegiatanAlatEntity`.
+     *    Jika alat ini ternyata masih dipinjam/sedang dipakai di sebuah kegiatan (`borrowings.isNotEmpty()`),
+     *    maka proses Hapus akan DICEGAT dengan pesan galak "Alat sedang dipinjam!".
+     * 2. Jika alat nganggur/bebas, serahkan pada Repository untuk dihapus secara halus (Soft-Delete).
+     * 3. Jadwalkan `WorkManager` untuk melaporkannya ke server nanti.
      *
-     * @param id ID unik alat yang akan dihapus
-     * @param onSuccess Fungsi yang dijalankan jika penghapusan sukses
-     * @param onError Fungsi yang dijalankan jika penghapusan gagal
+     * @param id ID unik alat.
+     * @param onSuccess Callback jika berhasil menghapus.
+     * @param onError Callback jika gagal (menampilkan Toast kemarahan).
      */
     fun deleteAlat(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
         viewModelScope.launch {

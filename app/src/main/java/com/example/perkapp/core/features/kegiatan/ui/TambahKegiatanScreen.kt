@@ -42,8 +42,10 @@ import java.util.Calendar
 import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
- * TambahKegiatanScreen — Halaman form (wizard 2 tahap) untuk mencatat kegiatan baru.
+ * FUNGSI: TambahKegiatanScreen
+ * TUJUAN: Halaman form (wizard 2 tahap) untuk mencatat kegiatan baru.
  *
+ * ALUR LOGIKA PENGERJAAN:
  * Tahap 1: Pengisian info umum kegiatan (nama, tanggal pinjam/kembali, lokasi, deskripsi, peminjam).
  * Tahap 2: Pemilihan alat dari inventaris dan/atau alat tambahan dari luar.
  *
@@ -59,42 +61,50 @@ fun TambahKegiatanScreen(
     kegiatanViewModel: AktivitasViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    
+    // Status langkah wizard saat ini (Tahap 1 atau Tahap 2)
     var currentStep by rememberSaveable { mutableStateOf(1) }
 
-    // State untuk Step 1
-    var namaAktivitas by rememberSaveable { mutableStateOf("") }
-    var tanggalPinjam by rememberSaveable { mutableStateOf("") }
-    var tanggalKembali by rememberSaveable { mutableStateOf("") }
-    val daftarPeminjam = remember { mutableStateListOf<String>() }
-    var peminjamInput by rememberSaveable { mutableStateOf("") }
-    var lokasi by rememberSaveable { mutableStateOf("") }
-    var deskripsi by rememberSaveable { mutableStateOf("") }
-    var dropdownTerbuka by rememberSaveable { mutableStateOf(false) }
+    // --- STATE UNTUK STEP 1: Informasi Dasar Kegiatan ---
+    var namaAktivitas by rememberSaveable { mutableStateOf("") } // Input nama/judul kegiatan
+    var tanggalPinjam by rememberSaveable { mutableStateOf("") } // Input tanggal mulai kegiatan
+    var tanggalKembali by rememberSaveable { mutableStateOf("") } // Input tanggal akhir kegiatan
+    val daftarPeminjam = remember { mutableStateListOf<String>() } // Daftar nama peminjam yang sudah ditambahkan (berupa Chip)
+    var peminjamInput by rememberSaveable { mutableStateOf("") } // Teks pencarian saat mengetik nama peminjam
+    var lokasi by rememberSaveable { mutableStateOf("") } // Lokasi kegiatan
+    var deskripsi by rememberSaveable { mutableStateOf("") } // Detail/catatan tambahan kegiatan
+    var dropdownTerbuka by rememberSaveable { mutableStateOf(false) } // Status dropdown pencarian user aktif atau tidak
 
-    // State untuk Step 2 (Pilihan Alat)
+    // --- STATE UNTUK STEP 2: Pemilihan Alat ---
+    // Mengambil daftar semua alat dari ViewModel, diobservasi secara reaktif
     val alatList by viewModel.alatList.observeAsState(emptyList<AlatEntity>())
+    // Menyimpan kuantitas alat yang dipilih dalam format [ID Alat -> Jumlah Pinjam]
     var selectedQuantities by remember { mutableStateOf(emptyMap<String, Int>()) }
+    // Menyimpan daftar alat eksternal/luar yang baru ditambahkan secara manual
     var externalTools by remember { mutableStateOf(emptyList<String>()) }
 
     // Listen to external tools added
+    // Mendengarkan/menangkap pengembalian data dari halaman "TambahAlatLuarScreen" (jika user menambahkan alat luar)
     val navBackStackEntry = navController.currentBackStackEntry
     val newToolState = navBackStackEntry?.savedStateHandle?.getLiveData<String>("alat_luar_nama")?.observeAsState()
     LaunchedEffect(newToolState?.value) {
         newToolState?.value?.let { newTool ->
+            // Jika ada alat baru dikembalikan dan belum ada dalam list, maka tambahkan
             if (newTool.isNotBlank() && !externalTools.contains(newTool)) {
                 externalTools = externalTools + newTool
+                // Hapus data dari savedStateHandle agar tidak ditambahkan berulang kali jika layar di-recompose
                 navBackStackEntry.savedStateHandle.remove<String>("alat_luar_nama")
             }
         }
     }
 
-    // Trigger get tools on launch
+    // Pemicu (Trigger) yang dijalankan sekali (saat layar ini pertama kali dibuka)
     LaunchedEffect(Unit) {
-        viewModel.getAllAlat()
-        kegiatanViewModel.fetchRegisteredUsers()
+        viewModel.getAllAlat() // Memuat data semua alat dari inventaris lokal/API
+        kegiatanViewModel.fetchRegisteredUsers() // Memuat daftar nama pengguna sistem untuk autocompletion peminjam
     }
 
-    // Date picker setup
+    // Konfigurasi sistem kalender untuk fitur Date Picker Dialog
     val calendar = Calendar.getInstance()
     val tahunKini = calendar.get(Calendar.YEAR)
     val bulanKini = calendar.get(Calendar.MONTH)
@@ -116,8 +126,12 @@ fun TambahKegiatanScreen(
         tahunKini, bulanKini, hariKini
     )
 
+    // Mengambil state daftar anggota yang terdaftar di aplikasi (untuk fitur autocompletion peminjam)
     val daftarAnggota by kegiatanViewModel.registeredUsers.collectAsState(initial = emptyList())
+    // Mengambil info pengguna yang sedang login
     val currentUserInfo by kegiatanViewModel.currentUserInfo.collectAsState()
+    
+    // Mendefinisikan gaya warna yang seragam (konsisten) untuk semua kolom input teks (TextField) di halaman ini
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.primary,
         unfocusedBorderColor = MaterialTheme.colorScheme.outline,
@@ -435,12 +449,13 @@ fun TambahKegiatanScreen(
                 ) {
                     Button(
                         onClick = {
+                            // Validasi tahap 1: Mencegah perpindahan ke tahap 2 jika ada kolom penting yang kosong
                             when {
                                 namaAktivitas.isBlank() -> Toast.makeText(context, "Nama Kegiatan tidak boleh kosong", Toast.LENGTH_SHORT).show()
                                 tanggalPinjam.isBlank() -> Toast.makeText(context, "Tanggal tidak boleh kosong", Toast.LENGTH_SHORT).show()
                                 daftarPeminjam.isEmpty() -> Toast.makeText(context, "Peminjam harus diisi minimal 1", Toast.LENGTH_SHORT).show()
                                 lokasi.isBlank() -> Toast.makeText(context, "Lokasi tidak boleh kosong", Toast.LENGTH_SHORT).show()
-                                else -> currentStep = 2
+                                else -> currentStep = 2 // Jika semua validasi lolos, pindah ke Langkah 2 (Pemilihan Alat)
                             }
                         },
                         modifier = Modifier
@@ -605,17 +620,21 @@ fun TambahKegiatanScreen(
                     ) {
                         Button(
                             onClick = {
+                                // Memfilter map alat: Hanya ambil alat yang jumlahnya (qty) lebih dari 0
                                 val selectedToolsList = selectedQuantities.entries
                                     .filter { it.value > 0 }
                                     .map { Pair(it.key, it.value) }
 
+                                // Validasi tahap 2: Harus ada alat yang dipinjam, baik dari inventaris maupun dari alat luar
                                 if (selectedToolsList.isEmpty() && externalTools.isEmpty()) {
                                     Toast.makeText(context, "Pilih minimal 1 perlengkapan atau tambah alat dari luar!", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
 
+                                // Menggabungkan array nama peminjam menjadi satu string utuh yang dipisah dengan koma
                                 val peminjamString = daftarPeminjam.joinToString(", ")
 
+                                // Mengirim seluruh data form ke ViewModel untuk disimpan ke database dan disinkronkan ke server
                                 kegiatanViewModel.insertKegiatan(
                                     judul = namaAktivitas,
                                     kategori = "Umum",
@@ -627,8 +646,9 @@ fun TambahKegiatanScreen(
                                     tools = selectedToolsList,
                                     externalTools = externalTools.toList(),
                                     onSuccess = {
+                                        // Callback jika proses simpan berhasil
                                         Toast.makeText(context, "Kegiatan berhasil disimpan!", Toast.LENGTH_SHORT).show()
-                                        navController.popBackStack()
+                                        navController.popBackStack() // Keluar dari halaman form dan kembali ke beranda
                                     }
                                 )
                             },
@@ -652,8 +672,8 @@ fun TambahKegiatanScreen(
 }
 
 /**
- * ToolSelectionCard — Komponen UI berupa kartu alat untuk halaman Tambah Kegiatan (Tahap 2).
- *
+ * FUNGSI: ToolSelectionCard
+ * TUJUAN: Komponen UI berupa kartu alat untuk halaman Tambah Kegiatan (Tahap 2).
  * Digunakan untuk memilih jumlah alat (kuantitas) yang ingin dipinjam.
  *
  * @param alat Data alat yang tersedia di inventaris
