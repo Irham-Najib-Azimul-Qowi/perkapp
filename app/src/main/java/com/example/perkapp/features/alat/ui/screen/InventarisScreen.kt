@@ -77,148 +77,154 @@ fun InventarisScreen(
     viewModel: AlatViewModel,
     onAddClick: () -> Unit = {},
     onItemClick: (String) -> Unit = {},
-    onBackClick: () -> Unit = {}
-) {
-    // Membaca daftar alat dan status loading dari ViewModel secara reaktif
+    onBackClick: () -> Unit = {} // Aksi callback saat menekan tombol kembali
+) { // Mulai dari fungsi Composable InventarisScreen
+    // Membaca daftar alat dari LiveData di ViewModel secara reaktif dengan nilai awal kosong
     val alatList by viewModel.alatList.observeAsState(emptyList())
+    // Membaca status loading data dari LiveData di ViewModel secara reaktif dengan nilai awal false
     val isLoading by viewModel.isLoading.observeAsState(false)
+    // Mengambil Context aplikasi Compose saat ini
     val context = LocalContext.current
-    // Status offline/online awal
+    // Menginisialisasi state status jaringan awal apakah tersambung internet
     var isOnline by remember { mutableStateOf(NetworkUtils.isOnline(context)) }
 
-    // Memantau perubahan status jaringan (internet) secara real-time
+    // Memantau aliran status koneksi internet secara asinkron/real-time
     LaunchedEffect(Unit) {
+        // Mengumpulkan status internet terbaru menggunakan observeNetworkStatus
         NetworkUtils.observeNetworkStatus(context).collectLatest { online ->
-            isOnline = online
-            // Jika tiba-tiba online, kita coba segarkan koneksi (silent login) dan ambil data terbaru
+            isOnline = online // Perbarui nilai state jaringan lokal
+            // Jika statusnya berubah menjadi online (tersambung internet)
             if (online) {
+                // Pindahkan eksekusi coroutine ke thread pekerja (IO)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    // Jalankan fungsi login latar belakang untuk memperbarui token kedaluwarsa
                     com.example.perkapp.core.network.RetrofitClient.performSilentLogin(context)
                 }
-                viewModel.getAllAlat()
+                viewModel.getAllAlat() // Muat ulang data daftar alat terbaru dari server
             }
         }
     }
 
-    // Mengambil data saat layar ini pertama kali dimunculkan
+    // Mengambil daftar seluruh alat dari lokal saat pertama kali layar dirender
     LaunchedEffect(Unit) {
-        viewModel.getAllAlat()
+        viewModel.getAllAlat() // Panggil fungsi getAllAlat di ViewModel
     }
 
+    // Scaffold menyusun kerangka visual utama halaman (TopBar, BottomBar, FAB, dan Konten)
     Scaffold(
-        topBar =  {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Inventaris Alat",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+        topBar =  { // Pengaturan bilah atas halaman (Top Bar)
+            TopAppBar( // Komponen TopAppBar
+                title = { // Judul di bilah atas
+                    Text( // Teks judul
+                        text = "Inventaris Alat", // Judul bertuliskan Inventaris Alat
+                        style = MaterialTheme.typography.titleLarge, // Gaya ukuran font judul besar
+                        fontWeight = FontWeight.Bold // Menebalkan teks judul
                     )
                 },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali ke Profil",
-                            tint = Color.White
+                navigationIcon = { // Ikon navigasi sebelah kiri judul
+                    IconButton(onClick = onBackClick) { // Tombol klik kembali
+                        Icon( // Komponen ikon
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack, // Menggunakan ikon panah kiri
+                            contentDescription = "Kembali ke Profil", // Deskripsi aksesibilitas tombol
+                            tint = Color.White // Mewarnai ikon dengan putih
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White
+                colors = TopAppBarDefaults.topAppBarColors( // Pengaturan skema warna TopAppBar
+                    containerColor = MaterialTheme.colorScheme.primary, // Warna kontainer utama primer aplikasi
+                    titleContentColor = Color.White // Warna konten/teks putih
                 )
             )
         },
         // Tombol (+) melayang di pojok kanan bawah
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick =  onAddClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(64.dp)
-                    .shadow(8.dp, CircleShape)
+        floatingActionButton = { // Menentukan tombol melayang (Floating Action Button)
+            FloatingActionButton( // Komponen FAB
+                onClick =  onAddClick, // Aksi callback diarahkan ke onAddClick saat diklik
+                containerColor = MaterialTheme.colorScheme.primary, // Warna latar belakang tombol primer
+                contentColor = Color.White, // Warna ikon putih
+                shape = CircleShape, // Potong bentuk bulat melingkar sempurna
+                modifier = Modifier // Pengubah ukuran dan efek tombol
+                    .size(64.dp) // Ukuran tombol 64dp
+                    .shadow(8.dp, CircleShape) // Bayangan tombol 8dp dengan bentuk bulat
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription =  "Tambah Alat",
-                    modifier = Modifier.size(28.dp)
+                Icon( // Komponen ikon di dalam tombol
+                    Icons.Default.Add, // Ikon tambah "+" bawaan
+                    contentDescription =  "Tambah Alat", // Deskripsi aksesibilitas tambah alat
+                    modifier = Modifier.size(28.dp) // Ukuran ikon 28dp
                 )
             }
         },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+        containerColor = MaterialTheme.colorScheme.background // Menentukan latar belakang layar utama
+    ) { innerPadding -> // Inner padding aman dari Scaffold
+        Column( // Menyusun elemen secara vertikal ke bawah
+            modifier = Modifier // Pengatur tata letak kolom
+                .fillMaxSize() // Lebar dan tinggi memenuhi layar penuh
+                .padding(innerPadding) // Terapkan padding aman dari Scaffold
         ) {
             // --- Peringatan Kuning Mode Offline ---
             // Muncul secara meluncur/animasi jika internet mati
-            AnimatedVisibility(
-                visible = !isOnline,
-                enter = slideInVertically() + fadeIn(),
-                exit = slideOutVertically() + fadeOut()
+            AnimatedVisibility( // Animasi visibilitas elemen
+                visible = !isOnline, // Tampil hanya saat status isOnline bernilai false
+                enter = slideInVertically() + fadeIn(), // Animasi muncul meluncur vertikal dan memudar masuk
+                exit = slideOutVertically() + fadeOut() // Animasi hilang meluncur vertikal dan memudar keluar
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFFF3CD))
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Row( // Menyusun ikon dan teks secara horizontal ke samping
+                    modifier = Modifier // Pengatur tata letak baris
+                        .fillMaxWidth() // Lebar baris memenuhi layar horizontal
+                        .background(Color(0xFFFFF3CD)) // Latar belakang warna kuning muda peringatan
+                        .padding(horizontal = 16.dp, vertical = 10.dp), // Jarak padding dalam kotak kuning
+                    verticalAlignment = Alignment.CenterVertically // Pusatkan elemen secara vertikal di tengah baris
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = Color(0xFF856404)
+                    Icon( // Ikon awan coret (Cloud Off)
+                        imageVector = Icons.Default.CloudOff, // Menggunakan ikon awan coret
+                        contentDescription = null, // Ikon dekoratif saja tanpa deskripsi suara
+                        modifier = Modifier.size(18.dp), // Ukuran ikon 18dp
+                        tint = Color(0xFF856404) // Warna ikon cokelat tua peringatan
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Mode Offline — Data akan disinkronkan saat online",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF856404)
+                    Spacer(modifier = Modifier.width(8.dp)) // Jarak spasi horizontal kecil antara ikon dan teks
+                    Text( // Teks informasi mode offline
+                        text = "Mode Offline — Data akan disinkronkan saat online", // Isi teks peringatan
+                        style = MaterialTheme.typography.bodySmall, // Gaya ukuran font kecil
+                        color = Color(0xFF856404) // Warna teks cokelat tua peringatan
                     )
                 }
             }
 
             // --- Menangani Tampilan Saat Sedang Loading, Kosong, Atau Ada Data ---
-            if (isLoading) {
+            if (isLoading) { // Jika status loading bernilai true
                 // Menampilkan efek putar loading
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                Box( // Box untuk memposisikan loading tepat di tengah layar
+                    modifier = Modifier.fillMaxSize(), // Memenuhi layar
+                    contentAlignment = Alignment.Center // Posisi objek di tengah
                 ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth =  3.dp
+                    CircularProgressIndicator( // Indikator lingkaran loading berputar
+                        color = MaterialTheme.colorScheme.primary, // Menggunakan warna primer aplikasi
+                        strokeWidth =  3.dp // Ketebalan garis lingkaran 3dp
                     )
                 }
-            } else if (alatList.isEmpty()){
+            } else if (alatList.isEmpty()){ // Jika status loading false dan daftar alat kosong
                 // Menampilkan pesan kosong jika belum ada data alat sama sekali
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                Box( // Wadah pemusat elemen teks kosong
+                    modifier = Modifier.fillMaxSize(), // Memenuhi layar penuh
+                    contentAlignment = Alignment.Center // Pusatkan konten di tengah layar
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Column( // Menyusun teks informasi kosong secara vertikal
+                        horizontalAlignment = Alignment.CenterHorizontally, // Tengahkan objek horizontal
+                        verticalArrangement = Arrangement.spacedBy(8.dp) // Jarak vertikal antar teks 8dp
                     ) {
-                        Text(
-                            text =  "Belum ada alat",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Text( // Teks judul kosong
+                            text =  "Belum ada alat", // Pesan belum ada alat
+                            style = MaterialTheme.typography.titleMedium, // Gaya ukuran font judul sedang
+                            color = MaterialTheme.colorScheme.onSurfaceVariant // Warna abu-abu gelap
                         )
-                        Text(
-                            text = "Tekan tombol + untuk menambah alat baru",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Text( // Teks arahan tambah alat
+                            text = "Tekan tombol + untuk menambah alat baru", // Cara menambah alat
+                            style = MaterialTheme.typography.bodyMedium, // Gaya ukuran teks deskripsi biasa
+                            color = MaterialTheme.colorScheme.onSurfaceVariant // Warna teks abu-abu gelap
                         )
                     }
                 }
-            } else {
+            } else { // Jika data alat ada dan loading telah selesai
                 // --- Menampilkan Dashboard Ringkasan & Daftar Alat ---
                 Row(
                     modifier = Modifier
