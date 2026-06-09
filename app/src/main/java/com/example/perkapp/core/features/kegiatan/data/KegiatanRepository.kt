@@ -15,51 +15,61 @@ import java.util.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 
-data class ParsedDescription(val peminjam: String, val lokasi: String, val kategori: String, val deskripsi: String, val isApproved: Boolean = false, val returnedTools: List<String> = emptyList())
+// Data class penampung hasil pembedahan (parsing) deskripsi gabungan kegiatan dari API
+data class ParsedDescription(
+    val peminjam: String, // String daftar nama peminjam alat
+    val lokasi: String, // String lokasi kegiatan
+    val kategori: String, // String kategori kegiatan
+    val deskripsi: String, // String deskripsi/catatan kegiatan
+    val isApproved: Boolean = false, // Status persetujuan peminjaman alat
+    val returnedTools: List<String> = emptyList() // List ID alat-alat yang sudah dikembalikan
+)
 
+// Fungsi pembantu untuk membedah string deskripsi gabungan dari server
 fun parseDescription(fullDesc: String?): ParsedDescription {
+    // Jika deskripsi kosong/null, kembalikan objek parsed kosong
     if (fullDesc == null) return ParsedDescription("", "", "", "")
-    var peminjam = ""
-    var lokasi = ""
-    var kategori = ""
-    var deskripsi = ""
-    var isApproved = false
-    val returnedTools = mutableListOf<String>()
+    var peminjam = "" // Inisialisasi string peminjam
+    var lokasi = "" // Inisialisasi string lokasi
+    var kategori = "" // Inisialisasi string kategori
+    var deskripsi = "" // Inisialisasi string deskripsi
+    var isApproved = false // Inisialisasi status approval default false
+    val returnedTools = mutableListOf<String>() // Inisialisasi list penampung alat dikembalikan
     
-    val lines = fullDesc.split("\n")
-    for (line in lines) {
-        val trimmed = line.trim()
-        when {
-            trimmed.startsWith("Peminjam: ") -> peminjam = trimmed.removePrefix("Peminjam: ")
-            trimmed.startsWith("Lokasi: ") -> lokasi = trimmed.removePrefix("Lokasi: ")
-            trimmed.startsWith("Kategori: ") -> kategori = trimmed.removePrefix("Kategori: ")
-            trimmed.startsWith("StatusAlat: ") -> {
-                val statusStr = trimmed.removePrefix("StatusAlat: ").trim()
-                if (statusStr.equals("Approved", ignoreCase = true)) {
-                    isApproved = true
+    val lines = fullDesc.split("\n") // Memisahkan deskripsi baris per baris
+    for (line in lines) { // Perulangan setiap baris deskripsi
+        val trimmed = line.trim() // Menghapus spasi di awal dan akhir baris
+        when { // Pencocokan awalan baris
+            trimmed.startsWith("Peminjam: ") -> peminjam = trimmed.removePrefix("Peminjam: ") // Mengambil data nama peminjam
+            trimmed.startsWith("Lokasi: ") -> lokasi = trimmed.removePrefix("Lokasi: ") // Mengambil data lokasi kegiatan
+            trimmed.startsWith("Kategori: ") -> kategori = trimmed.removePrefix("Kategori: ") // Mengambil data kategori kegiatan
+            trimmed.startsWith("StatusAlat: ") -> { // Mengecek status persetujuan peminjaman alat
+                val statusStr = trimmed.removePrefix("StatusAlat: ").trim() // Membaca teks status alat
+                if (statusStr.equals("Approved", ignoreCase = true)) { // Jika statusnya adalah Approved
+                    isApproved = true // Set status persetujuan menjadi true
                 }
             }
-            trimmed.startsWith("ReturnedTools: ") -> {
-                val toolsStr = trimmed.removePrefix("ReturnedTools: ")
-                if (toolsStr.isNotBlank()) {
-                    returnedTools.addAll(toolsStr.split(",").map { it.trim() })
+            trimmed.startsWith("ReturnedTools: ") -> { // Mengecek daftar alat yang telah dikembalikan
+                val toolsStr = trimmed.removePrefix("ReturnedTools: ") // Membaca teks daftar alat
+                if (toolsStr.isNotBlank()) { // Jika daftar alat tidak kosong
+                    returnedTools.addAll(toolsStr.split(",").map { it.trim() }) // Masukkan ke list dengan menghapus spasi
                 }
             }
-            trimmed.startsWith("Deskripsi: ") -> deskripsi = trimmed.removePrefix("Deskripsi: ")
-            else -> {
-                if (trimmed.isNotBlank()) {
-                    if (deskripsi.isEmpty()) {
-                        deskripsi = trimmed
+            trimmed.startsWith("Deskripsi: ") -> deskripsi = trimmed.removePrefix("Deskripsi: ") // Mengambil data uraian deskripsi
+            else -> { // Jika baris tidak memiliki tag di atas
+                if (trimmed.isNotBlank()) { // Jika baris tidak kosong
+                    if (deskripsi.isEmpty()) { // Jika deskripsi utama masih kosong
+                        deskripsi = trimmed // Isi dengan baris ini
                     } else {
-                        deskripsi += "\n$trimmed"
+                        deskripsi += "\n$trimmed" // Gabungkan baris ini dengan baris deskripsi sebelumnya
                     }
                 }
             }
         }
     }
+    // Mengembalikan objek ParsedDescription yang telah diisi lengkap
     return ParsedDescription(peminjam, lokasi, kategori, deskripsi, isApproved, returnedTools)
 }
-
 /**
  * FUNGSI: KegiatanRepository
  * TUJUAN: Antarmuka (Interface) untuk sumber data fitur Kegiatan.
@@ -133,46 +143,65 @@ class KegiatanRepositoryImpl(
         return localDate
     }
 
+    // Membantu memformat tanggal Laravel (YYYY-MM-DD) -> lokal (DD/MM/YYYY)
     private fun formatFromLaravelDate(laravelDate: String?): String {
+        // Jika null atau kosong, default tanggal ke 01/01/2026
         if (laravelDate.isNullOrBlank()) return "01/01/2026"
+        // Membersihkan string tanggal dari jam jika ada (split spasi)
         val cleanDate = laravelDate.split(" ").firstOrNull() ?: laravelDate
+        // Memecah berdasarkan tanda strip (-)
         val parts = cleanDate.split("-")
+        // Jika ada 3 bagian format (tahun, bulan, hari)
         if (parts.size == 3) {
+            // Gabungkan menjadi hari/bulan/tahun
             return "${parts[2]}/${parts[1]}/${parts[0]}"
         }
+        // Jika format lain, kembalikan teks aslinya
         return cleanDate
     }
 
+    // Memetakan status lokal ke status server (Laravel)
     private fun mapToLaravelStatus(localStatus: String): String {
+        // Cek nama status lokal
         return when (localStatus.uppercase()) {
-            "BERLANGSUNG" -> "ongoing"
-            "SELESAI" -> "completed"
-            else -> "draft"
+            "BERLANGSUNG" -> "ongoing" // ongoing untuk berlangsung
+            "SELESAI" -> "completed" // completed untuk selesai
+            else -> "draft" // draft jika status draf
         }
     }
 
+    // Memetakan status server (Laravel) ke status lokal
     private fun mapFromLaravelStatus(laravelStatus: String?): String {
+        // Cek nilai status laravel
         return when (laravelStatus?.lowercase()) {
-            "ongoing" -> "BERLANGSUNG"
-            "completed" -> "SELESAI"
-            else -> "DRAFT"
+            "ongoing" -> "BERLANGSUNG" // ongoing jadi berlangsung
+            "completed" -> "SELESAI" // completed jadi selesai
+            else -> "DRAFT" // default draft
         }
     }
 
+    // Mengambil status statistik jumlah barang dipinjam, tersedia, dan antrean sync
     override suspend fun getInventoryStats(): Result<InventoryStats> {
+        // Jalankan block try catch aman
         return try {
+            // Mengambil instance database lokal
             val db = AppDatabase.getDatabase(context)
+            // Mengambil DAO alat
             val alatDao = db.alatDao()
+            // Mengambil semua data alat
             val allAlat = alatDao.getAllAlat()
             
+            // Menjumlahkan seluruh stok alat tersedia
             val availableCount = allAlat.sumOf { it.available_qty }
+            // Menghitung jumlah alat dengan status sync pending
             val pendingSyncCount = allAlat.count { it.sync_status == "pending" }
             
-            // Query total active borrowed tools
+            // Query langsung ke SQLite untuk jumlah alat yang belum dikembalikan
             val allKegiatanAlat = db.openHelper.readableDatabase.compileStatement(
                 "SELECT COUNT(*) FROM kegiatan_alat WHERE isReturned = 0"
             ).simpleQueryForLong().toInt()
 
+            // Kembalikan status sukses beserta objek InventoryStats
             Result.success(
                 InventoryStats(
                     borrowedCount = allKegiatanAlat,
@@ -180,8 +209,9 @@ class KegiatanRepositoryImpl(
                     pendingSyncCount = pendingSyncCount
                 )
             )
-        } catch (e: Exception) {
-            e.printStackTrace()
+        } catch (e: Exception) { // Tangkap error jika terjadi exception
+            e.printStackTrace() // Cetak stack trace error
+            // Kembalikan default status sukses berisi 0
             Result.success(InventoryStats(borrowedCount = 0, availableCount = 0, pendingSyncCount = 0))
         }
     }

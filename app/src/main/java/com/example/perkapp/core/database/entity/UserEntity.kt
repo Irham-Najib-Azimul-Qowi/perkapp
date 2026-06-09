@@ -1,7 +1,7 @@
-package com.example.perkapp.core.database.entity
+package com.example.perkapp.core.database.entity // Paket entitas database lokal
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.Entity // Mengimpor anotasi Entity Room
+import androidx.room.PrimaryKey // Mengimpor anotasi PrimaryKey Room
 
 /**
  * UserEntity — Struktur Data (Tabel) Profil Aktif.
@@ -12,19 +12,20 @@ import androidx.room.PrimaryKey
  * dan aktif login ke dalam aplikasi. Jika user menekan tombol Logout, 
  * data di tabel ini akan dikosongkan (di-wipe).
  */
-@Entity(tableName = "users")
-data class UserEntity(
+@Entity(tableName = "users") // Mendefinisikan kelas ini sebagai tabel users di database Room
+data class UserEntity( // Mendeklarasikan data class UserEntity
     // ID unik pengguna dari server (Primary Key)
-    @PrimaryKey
-    val id: String,
+    @PrimaryKey // Menentukan id sebagai primary key unik
+    val id: String, // ID unik pengguna
     // Nama lengkap pengguna
-    val name: String,
+    val name: String, // Nama lengkap pengguna
     // Alamat email yang terdaftar
-    val email: String,
+    val email: String, // Email pengguna
     // Password (disimpan opsional untuk keperluan login ulang saat offline)
-    val password: String? = null,
+    val password: String? = null, // Kata sandi opsional
     // Peran pengguna: "admin" atau "member"
-    val role: String,
+    val role: String, // Hak akses peran pengguna
     // Kapan akun ini dibuat di server
-    val created_at: String
+    val created_at: String // String waktu pembuatan akun
 )
+

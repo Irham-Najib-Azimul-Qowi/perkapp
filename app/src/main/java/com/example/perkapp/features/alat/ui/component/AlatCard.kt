@@ -149,7 +149,7 @@ fun AlatCard(
                 Row{
                     Text(
                         text = "Stok: ${alat.available_qty}/${alat.total_qty}",
-                        style = MaterialTheme.typolgraphy.bodySmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 

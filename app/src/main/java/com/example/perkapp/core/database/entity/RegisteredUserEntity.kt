@@ -1,7 +1,7 @@
-package com.example.perkapp.core.database.entity
+package com.example.perkapp.core.database.entity // Paket entitas database lokal core
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
+import androidx.room.Entity // Mengimpor komponen anotasi Entity Room
+import androidx.room.PrimaryKey // Mengimpor komponen PrimaryKey Room
 
 /**
  * RegisteredUserEntity — Struktur Data Direktori Akun (Buku Telepon Pengguna).
@@ -12,12 +12,13 @@ import androidx.room.PrimaryKey
  * Tabel inilah yang menyimpan daftar nama-nama tersebut. Ia bertindak seperti 
  * buku kontak lokal di dalam HP.
  */
-@Entity(tableName = "registered_users")
-data class RegisteredUserEntity(
-    @PrimaryKey
-    val id: String,
-    val name: String,
-    val email: String,
+@Entity(tableName = "registered_users") // Mendefinisikan kelas ini sebagai tabel database bernama registered_users
+data class RegisteredUserEntity( // Mendeklarasikan data class RegisteredUserEntity
+    @PrimaryKey // Menentukan properti di bawah ini sebagai Primary Key unik di tabel
+    val id: String, // Variabel string penyimpan ID pengguna unik
+    val name: String, // Variabel string nama pengguna
+    val email: String, // Variabel string email pengguna
     // Peran pengguna: "admin" atau "member"
-    val role: String
+    val role: String // Variabel string peran hak akses pengguna
 )
+

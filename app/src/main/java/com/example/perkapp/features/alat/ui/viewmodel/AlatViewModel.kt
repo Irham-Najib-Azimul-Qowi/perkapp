@@ -22,51 +22,51 @@ import kotlinx.coroutines.launch
  * butuh 'context' (misalnya mengecek status internet atau jadwal sinkronisasi).
  */
 class AlatViewModel(
+    // Parameter repository sebagai penyedia tunggal data alat (local & remote)
     private val repository: AlatRepository,
+    // Parameter application untuk akses context global Android (cek internet, worker, dll)
     private val application: Application
 ) : ViewModel(){
     
-    // MutableLiveData adalah "kotak reaktif" penyimpan data yang bisa diubah oleh ViewModel.
-    // UI akan "berlangganan" (observe) kotak ini, jadi kalau isinya berubah, UI otomatis update.
-    
-    // Menyimpan daftar semua alat yang akan ditampilkan di layar inventaris
+    // LiveData reaktif penyimpan daftar semua entitas alat untuk dibaca oleh UI daftar alat
     val alatList = MutableLiveData<List<AlatEntity>>()
     
-    // Menyimpan satu alat spesifik yang sedang dipilih (misal untuk diedit atau dilihat detailnya)
+    // LiveData penyimpan satu entitas alat yang terpilih (untuk detail atau edit)
     val selectedAlat = MutableLiveData<AlatEntity?>()
     
-    // Menyimpan status apakah sedang proses loading atau tidak (untuk menampilkan spinner)
+    // LiveData penunjuk status loading (putar progress bar jika bernilai true)
     val isLoading = MutableLiveData(false)
     
-    // Menyimpan pesan error jika ada proses yang gagal, agar bisa ditampilkan ke user (misal lewat Toast/Snackbar)
+    // LiveData penyimpan pesan kesalahan untuk ditampilkan sebagai Toast/Snackbar di UI
     val errorMessage = MutableLiveData<String?>()
 
     init {
-        // Saat ViewModel pertama kali dibuat, langsung ambil data alat dari repository
+        // Saat pertama kali ViewModel dibuat, langsung ambil data alat terbaru
         getAllAlat()
-        // Mulai memantau perubahan koneksi internet (online/offline)
+        // Daftarkan pengamat perubahan koneksi internet
         observeNetworkChanges()
     }
 
     /**
-     * Memantau perubahan status jaringan (internet).
-     * Jika mendeteksi HP kembali online, otomatis memicu sinkronisasi data 
-     * yang masih berstatus "pending" (belum terkirim ke server).
+     * Memantau status koneksi internet HP secara real-time.
+     * Jika HP kembali online, otomatis mengirim sisa data pending ke server.
      */
     private fun observeNetworkChanges() {
+        // Meluncurkan coroutine dalam cakupan daur hidup ViewModel
         viewModelScope.launch {
-            // Memantau flow status jaringan secara terus-menerus
+            // Berlangganan status jaringan (true jika ada internet, false jika offline)
             com.example.perkapp.core.utils.NetworkUtils.observeNetworkStatus(application)
                 .collect { isOnline ->
-                    // Jika jaringan baru saja kembali online
+                    // Jika terdeteksi HP baru saja mendapatkan koneksi internet kembali
                     if (isOnline) {
                         try {
-                            // Coba sinkronisasi data yang belum terkirim
+                            // Memicu sinkronisasi data-data offline yang masih tertunda
                             repository.syncPendingData()
                         } catch (e: Exception) {
+                            // Cetak error ke logcat jika sinkronisasi background gagal
                             e.printStackTrace()
                         } finally {
-                            // Selalu perbarui daftar alat di layar agar data terupdate
+                            // Selalu segarkan kembali daftar data alat di layar
                             getAllAlat()
                         }
                     }
@@ -76,40 +76,37 @@ class AlatViewModel(
 
     /**
      * FUNGSI: getAllAlat
-     * TUJUAN: Menjadi pintu masuk data dari Repository ke UI (Layar).
-     *
-     * ALUR LOGIKA PENGERJAAN:
-     * 1. Mengubah `isLoading` menjadi true agar Spinner muncul di layar.
-     * 2. Jika internet hidup, secara agresif memaksa `repository.syncPendingData()`
-     *    untuk mengirim barang-barang yang masih nyangkut.
-     * 3. Meminta seluruh daftar alat (`getAllAlat`) dari Repository dan menampungnya ke `alatList`.
-     * 4. Jika koneksi putus (Error), tampilkan pesan "Gagal terhubung".
-     * 5. Pada blok `finally`, matikan efek Loading.
+     * TUJUAN: Memuat seluruh daftar alat dari database lokal ke UI.
      */
     fun getAllAlat() {
+        // Meluncurkan coroutine latar belakang
         viewModelScope.launch {
+            // Aktifkan indikator loading berputar di layar
             isLoading.value = true
             try {
-                // Mengecek koneksi internet
+                // Cek apakah perangkat terhubung internet saat ini
                 if (com.example.perkapp.core.utils.NetworkUtils.isOnline(application)) {
                     try {
+                        // Jika ada internet, usahakan langsung sinkronkan antrean pending terlebih dahulu
                         repository.syncPendingData()
                     } catch (e: Exception) {
+                        // Abaikan kegagalan sinkronisasi kecil di sini agar pemuatan data utama tidak terhambat
                         e.printStackTrace()
                     }
                 }
-                // Meminta data dari repository dan menyimpannya di LiveData
+                // Ambil daftar data alat dari repository dan taruh ke LiveData untuk dibaca UI
                 alatList.value = repository.getAllAlat()
             } catch (e: Exception) {
-                // Menangkap exception dan menentukan jenis errornya
+                // Tentukan pesan kesalahan berdasarkan jenis exception jaringan atau lainnya
                 val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
                     "Gagal terhubung ke server. Periksa koneksi internet Anda."
                 } else {
                     "Terjadi kesalahan saat memuat data alat. Silakan coba lagi."
                 }
+                // Kirim pesan error ke LiveData agar UI memunculkan Toast
                 errorMessage.value = errorMsg
             } finally {
-                // Selalu matikan loading, baik proses sukses maupun gagal
+                // Matikan indikator loading di layar
                 isLoading.value = false
             }
         }
@@ -117,44 +114,34 @@ class AlatViewModel(
 
     /**
      * FUNGSI: createAlat
-     * TUJUAN: Menjadi jembatan ketika tombol "Simpan" ditekan di layar `TambahAlatScreen`.
-     *
-     * ALUR LOGIKA PENGERJAAN:
-     * 1. Mencegah Dobel Klik: Cek `isLoading.value == true`, jika ya, batalkan aksi.
-     * 2. Nyalakan Loading.
-     * 3. Minta Repository membuatkan data.
-     * 4. Menjadwalkan WorkManager (`SyncManager.scheduleSyncWhenOnline()`) sebagai jaring 
-     *    pengaman jika proses sinkronisasi gagal di tengah jalan.
-     * 5. *Refresh* (Panggil `getAllAlat()`) agar alat yang baru terbuat langsung nongol di layar.
-     *
-     * @param name Nama barang.
-     * @param category Kategori barang.
-     * @param totalQty Jumlah awal.
-     * @param condition Kondisi (Baik/Rusak).
-     * @param imagePath Lokasi foto.
+     * TUJUAN: Menambahkan data alat baru secara offline-first.
      */
     fun createAlat(name: String, category: String, totalQty: Int, condition: String, imagePath: String?) {
-        // Cegah eksekusi ganda jika tombol diklik berkali-kali saat masih loading
+        // Jika sedang melakukan proses loading lain, hentikan pemicuan dobel
         if (isLoading.value == true) return
         
+        // Meluncurkan coroutine latar belakang
         viewModelScope.launch {
+            // Aktifkan status loading
             isLoading.value = true
             try {
-                // Minta repository untuk menyimpan data alat baru
+                // Simpan alat baru ke database lokal lewat repository (flag pending_action = 'create')
                 repository.createAlat(name, category, totalQty, condition, imagePath)
-                // Jadwalkan sinkronisasi di background lewat WorkManager untuk berjaga-jaga
+                // Jadwalkan WorkManager untuk sinkronisasi di latar belakang saat online nanti
                 SyncManager.scheduleSyncWhenOnline(application)
             } catch (e: Exception) {
-                // Jika sedang offline, pembuatan alat tetap berhasil di lokal
+                // Tangani exception jika terjadi kegagalan jaringan saat coba sync instan
                 val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
                     "Gagal terhubung ke server. Alat akan disimpan dan disinkronkan nanti saat online."
                 } else {
                     "Terjadi kesalahan saat menyimpan alat. Silakan coba lagi."
                 }
+                // Set LiveData error message agar UI menampilkan Toast
                 errorMessage.value = errorMsg
             } finally {
-                // Refresh daftar alat dan matikan loading
+                // Ambil ulang data alat terbaru untuk memperbarui layar
                 getAllAlat()
+                // Matikan loading
                 isLoading.value = false
             }
         }
@@ -162,35 +149,32 @@ class AlatViewModel(
 
     /**
      * FUNGSI: getAlatById
-     * TUJUAN: Menarik satu data spesifik dari gudang penyimpanan.
-     * Hasil pencarian akan ditaruh di keranjang `selectedAlat`.
-     * Layar `DetailAlatScreen` dan `EditAlatScreen` sudah berlangganan ke keranjang ini,
-     * sehingga saat datanya masuk, layarnya langsung merender informasi alat tersebut.
-     *
-     * @param id ID unik alat.
+     * TUJUAN: Mengambil satu data alat spesifik berdasarkan ID.
      */
     fun getAlatById(id: String) {
+        // Jalankan coroutine
         viewModelScope.launch {
+            // Ambil data dari lokal dan simpan ke selectedAlat LiveData
             selectedAlat.value = repository.getAlatById(id)
         }
     }
 
     /**
      * FUNGSI: updateAlat
-     * TUJUAN: Mengeksekusi penyimpanan hasil edit (Ubah Alat).
-     *
-     * @param alat Objek data barang versi usang (Sebelum diedit).
-     * @param request Bungkusan data form yang baru diisi.
+     * TUJUAN: Memperbarui data alat yang sudah ada.
      */
     fun updateAlat(alat: AlatEntity, request: CreateAlatRequest) {
+        // Jalankan coroutine
         viewModelScope.launch {
+            // Aktifkan loading
             isLoading.value = true
             try {
-                // Minta repository untuk memperbarui data
+                // Kirim perintah update data alat ke repository
                 repository.updateAlat(alat, request)
-                // Jadwalkan sync jika data berubah dan perlu dikirim ke server nanti
+                // Jadwalkan sinkronisasi otomatis via WorkManager
                 SyncManager.scheduleSyncWhenOnline(application)
             } catch (e: Exception) {
+                // Tentukan jenis pesan error
                 val errorMsg = if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
                     "Gagal terhubung ke server. Perubahan akan disinkronkan nanti saat online."
                 } else {
@@ -198,6 +182,7 @@ class AlatViewModel(
                 }
                 errorMessage.value = errorMsg
             } finally {
+                // Segarkan data di layar dan matikan loading
                 getAllAlat()
                 isLoading.value = false
             }
@@ -206,42 +191,33 @@ class AlatViewModel(
 
     /**
      * FUNGSI: deleteAlat
-     * TUJUAN: Menghapus alat dengan perlindungan ekstra.
-     *
-     * ALUR LOGIKA PENGERJAAN:
-     * 1. Validasi Silang (Cross-Check): Sebelum menghapus, ia mengintip tabel `KegiatanAlatEntity`.
-     *    Jika alat ini ternyata masih dipinjam/sedang dipakai di sebuah kegiatan (`borrowings.isNotEmpty()`),
-     *    maka proses Hapus akan DICEGAT dengan pesan galak "Alat sedang dipinjam!".
-     * 2. Jika alat nganggur/bebas, serahkan pada Repository untuk dihapus secara halus (Soft-Delete).
-     * 3. Jadwalkan `WorkManager` untuk melaporkannya ke server nanti.
-     *
-     * @param id ID unik alat.
-     * @param onSuccess Callback jika berhasil menghapus.
-     * @param onError Callback jika gagal (menampilkan Toast kemarahan).
+     * TUJUAN: Menghapus alat dengan perlindungan pengecekan peminjaman aktif.
      */
     fun deleteAlat(id: String, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        // Jalankan coroutine
         viewModelScope.launch {
+            // Aktifkan loading
             isLoading.value = true
             try {
-                // Cek apakah alat sedang dipinjam oleh kegiatan
-                // Mengambil instance database secara langsung (bisa direfaktor ke repository nantinya)
+                // Ambil database lokal secara langsung untuk mengecek relasi kegiatan aktif
                 val db = com.example.perkapp.core.database.AppDatabase.getDatabase(application)
+                // Ambil daftar peminjaman aktif alat ini pada kegiatan yang belum selesai
                 val borrowings = db.kegiatanDao().getActiveBorrowingsForAlat(id)
                 
-                // Jika ada riwayat peminjaman yang masih aktif, batalkan penghapusan
+                // Jika masih ada kegiatan yang meminjam alat ini, cegat proses hapus
                 if (borrowings.isNotEmpty()) {
                     throw Exception("Alat sedang dipinjam oleh kegiatan dan tidak bisa dihapus!")
                 }
 
-                // Lanjut hapus jika aman
+                // Jika aman, lanjutkan penghapusan via repository
                 repository.deleteAlat(id)
-                // Jadwalkan sync agar penghapusan dikirim ke server saat online
+                // Jadwalkan sinkronisasi WorkManager untuk menghapus alat dari server
                 SyncManager.scheduleSyncWhenOnline(application)
                 
-                // Panggil callback berhasil
+                // Panggil callback sukses
                 onSuccess()
             } catch (e: Exception) {
-                // Identifikasi error: apakah ditolak karena dipinjam, jaringan, atau lainnya
+                // Tangkap pesan kesalahan
                 val errorMsg = if (e.message?.contains("Alat sedang dipinjam") == true) {
                     e.message
                 } else if (e is java.net.UnknownHostException || e is java.net.ConnectException) {
@@ -250,9 +226,10 @@ class AlatViewModel(
                     "Terjadi kesalahan saat menghapus alat. Silakan coba lagi."
                 }
                 errorMessage.value = errorMsg
-                // Panggil callback gagal dengan pesan error
+                // Jalankan callback error
                 onError(errorMsg ?: "Gagal menghapus alat")
             } finally {
+                // Perbarui daftar layar dan matikan loading
                 getAllAlat()
                 isLoading.value = false
             }

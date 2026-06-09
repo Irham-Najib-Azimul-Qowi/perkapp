@@ -1,10 +1,10 @@
-package com.example.perkapp.core.database.dao
+package com.example.perkapp.core.database.dao // Paket data access object database lokal
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import com.example.perkapp.core.database.entity.RegisteredUserEntity
+import androidx.room.Dao // Mengimpor anotasi Dao untuk Room
+import androidx.room.Insert // Mengimpor anotasi Insert untuk penyimpanan data ke database
+import androidx.room.OnConflictStrategy // Mengimpor opsi penanganan konflik data duplikat
+import androidx.room.Query // Mengimpor anotasi Query untuk menulis query SQL manual
+import com.example.perkapp.core.database.entity.RegisteredUserEntity // Mengimpor entitas model RegisteredUserEntity
 
 /**
  * RegisteredUserDao — Data Access Object untuk tabel 'registered_users'.
@@ -13,35 +13,28 @@ import com.example.perkapp.core.database.entity.RegisteredUserEntity
  * di aplikasi ini (bukan cuma user yang sedang login, tapi SEMUA user).
  * Daftar ini biasanya dipakai untuk memilih nama "Peminjam" saat membuat kegiatan.
  */
-@Dao
-interface RegisteredUserDao {
+@Dao // Menandai interface ini sebagai DAO agar Room memproses kueri database
+interface RegisteredUserDao { // Deklarasi interface RegisteredUserDao
+
     /**
      * FUNGSI: insertAll
-     * TUJUAN: Menyimpan daftar massal (Bulk Insert) seluruh pengguna yang ada di sistem server 
-     * ke dalam database lokal perangkat (Room). Jika ID pengguna sudah terdaftar, 
-     * datanya akan ditimpa dengan versi terbaru (`OnConflictStrategy.REPLACE`).
-     * @param users List daftar pengguna dari API.
+     * TUJUAN: Menyimpan daftar massal seluruh pengguna ke database lokal.
      */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(users: List<RegisteredUserEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) // Menggunakan operasi INSERT dengan strategi menimpa jika konflik
+    suspend fun insertAll(users: List<RegisteredUserEntity>) // Fungsi asinkron suspend untuk menyimpan data massal
 
     /**
      * FUNGSI: getAllRegisteredUsers
-     * TUJUAN: Membaca daftar seluruh pengguna sistem yang telah diunduh dan tersimpan di HP.
-     * Sangat berguna saat perangkat offline (tidak ada sinyal), aplikasi tetap bisa 
-     * menampilkan pilihan nama "Peminjam" pada form tambah kegiatan tanpa perlu tembak API.
-     * @return List entitas pengguna terdaftar.
+     * TUJUAN: Membaca daftar seluruh pengguna sistem yang tersimpan di HP.
      */
-    @Query("SELECT * FROM registered_users")
-    suspend fun getAllRegisteredUsers(): List<RegisteredUserEntity>
+    @Query("SELECT * FROM registered_users") // Query SQL untuk menarik seluruh kolom dari tabel registered_users
+    suspend fun getAllRegisteredUsers(): List<RegisteredUserEntity> // Fungsi asinkron suspend pengambil data terdaftar
 
     /**
      * FUNGSI: clearAll
      * TUJUAN: Mengosongkan seluruh tabel `registered_users`.
-     * Metode ini umumnya dipanggil persis sebelum menarik (fetch) data terbaru dari server,
-     * agar data pengguna lama yang mungkin sudah dihapus oleh admin di server tidak 
-     * menumpuk dan menjadi data "hantu" di HP.
      */
-    @Query("DELETE FROM registered_users")
-    suspend fun clearAll()
+    @Query("DELETE FROM registered_users") // Query SQL untuk menghapus bersih semua baris dari tabel registered_users
+    suspend fun clearAll() // Fungsi asinkron suspend untuk menghapus tabel
 }
+
