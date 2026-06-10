@@ -5,8 +5,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.example.perkapp.core.navigation.BottomBar
-import com.example.perkapp.core.navigation.SetupNavGraph
+import com.example.perkapp.ui.components.BottomBar
+import com.example.perkapp.navigation.SetupNavGraph
 
 /**
  * PerkappApp — Kerangka (Layout) utama dari antarmuka aplikasi.

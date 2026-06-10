@@ -135,4 +135,7 @@ dependencies {
 
     // WorkManager for offline sync
     implementation(libs.work.runtime.ktx)
+
+    // BCrypt for secure password hashing
+    implementation("org.mindrot:jbcrypt:0.4")
 }

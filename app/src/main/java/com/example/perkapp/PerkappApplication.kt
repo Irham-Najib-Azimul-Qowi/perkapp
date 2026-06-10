@@ -43,5 +43,6 @@ class PerkappApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        com.example.perkapp.util.SecurityUtils.init(this)
     }
 }

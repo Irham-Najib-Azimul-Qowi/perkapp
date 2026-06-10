@@ -1,0 +1,151 @@
+package com.example.perkapp.database
+
+import android.content.Context
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.perkapp.dao.UserDao
+import com.example.perkapp.dao.KegiatanDao
+import com.example.perkapp.model.UserEntity
+import com.example.perkapp.model.KegiatanEntity
+import com.example.perkapp.model.KegiatanAlatEntity
+import com.example.perkapp.model.RegisteredUserEntity
+import com.example.perkapp.dao.RegisteredUserDao
+import com.example.perkapp.dao.AlatDao
+import com.example.perkapp.model.AlatEntity
+import com.example.perkapp.dao.ImageDao
+import com.example.perkapp.model.ImageEntity
+
+/**
+ * AppDatabase — Database lokal aplikasi menggunakan Room.
+ *
+ * Room adalah library Android untuk menyimpan data secara lokal di HP
+ * menggunakan SQLite. Database ini adalah "gudang data offline" aplikasi.
+ *
+ * Semua data (alat, kegiatan, user, gambar) tersimpan di sini dan tetap
+ * ada walaupun aplikasi ditutup atau tidak ada internet.
+ *
+ * Versi saat ini: 9 (setiap kali ada perubahan struktur tabel, versi harus naik)
+ */
+// @Database: memberitahu Room daftar tabel yang ada dan versi database
+// entities: daftar semua kelas Entity yang akan dibuat tabelnya
+// exportSchema: false → tidak ekspor skema ke file JSON (lebih simpel untuk proyek ini)
+@Database(
+    entities = [UserEntity::class, AlatEntity::class, ImageEntity::class, KegiatanEntity::class, KegiatanAlatEntity::class, RegisteredUserEntity::class],
+    version = 9,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+    /**
+     * FUNGSI: userDao
+     * TUJUAN: Menyediakan akses ke tabel 'users' untuk mengelola profil pengguna yang sedang login.
+     * @return UserDao yang berisi kumpulan kueri SQLite untuk entitas UserEntity.
+     */
+    abstract fun userDao(): UserDao
+
+    /**
+     * FUNGSI: registeredUserDao
+     * TUJUAN: Menyediakan akses ke tabel 'registered_users' untuk membaca daftar semua akun terdaftar 
+     * di sistem (biasanya digunakan untuk dropdown pemilihan peminjam alat).
+     * @return RegisteredUserDao untuk entitas RegisteredUserEntity.
+     */
+    abstract fun registeredUserDao(): RegisteredUserDao
+
+    /**
+     * FUNGSI: alatDao
+     * TUJUAN: Menyediakan akses ke tabel 'alat' untuk membaca, menambah, atau mengurangi 
+     * persediaan stok inventaris barang.
+     * @return AlatDao untuk entitas AlatEntity.
+     */
+    abstract fun alatDao(): AlatDao
+
+    /**
+     * FUNGSI: imageDao
+     * TUJUAN: Menyediakan akses ke tabel 'images' untuk menyimpan antrean gambar 
+     * (foto barang) yang belum terunggah ke server saat offline.
+     * @return ImageDao untuk entitas ImageEntity.
+     */
+    abstract fun imageDao(): ImageDao
+
+    /**
+     * FUNGSI: kegiatanDao
+     * TUJUAN: Menyediakan akses ke tabel 'kegiatan' dan 'kegiatan_alat' untuk mencatat
+     * riwayat acara dan barang apa saja yang dipinjam pada acara tersebut.
+     * @return KegiatanDao untuk entitas KegiatanEntity dan KegiatanAlatEntity.
+     */
+    abstract fun kegiatanDao(): KegiatanDao
+
+    companion object {
+        // @Volatile: memastikan perubahan nilai INSTANCE langsung terlihat di semua thread
+        // Ini penting agar tidak ada dua instance database yang dibuat bersamaan
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        // Migrasi dari versi 1 ke 2: tambah kolom pending_action dan image_path pada tabel alat
+        // Jika user update aplikasi dari versi lama ke baru, data lama tidak hilang, cuma ditambah kolom
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE alat ADD COLUMN pending_action TEXT DEFAULT NULL")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                try {
+                    db.execSQL("ALTER TABLE alat ADD COLUMN image_path TEXT DEFAULT NULL")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        // Migrasi dari versi 7 ke 8: tambah kolom created_by di tabel kegiatan
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE kegiatan ADD COLUMN created_by TEXT DEFAULT NULL")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        // Migrasi dari versi 8 ke 9: tambah penanda apakah alat sudah disetujui (alat_approved)
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE kegiatan ADD COLUMN alat_approved INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        /**
+         * Mengambil instance database — hanya akan dibuat sekali (Singleton pattern).
+         *
+         * Singleton pattern: pastikan hanya ada SATU instance database di seluruh app.
+         * Kenapa? Membuat banyak instance database bisa menyebabkan konflik data dan memori penuh.
+         *
+         * @param context — Context diperlukan Room untuk tahu lokasi penyimpanan database
+         */
+        fun getDatabase(context: Context): AppDatabase {
+            // Jika instance sudah ada, langsung kembalikan (tidak buat baru)
+            return INSTANCE ?: synchronized(this) {
+                // synchronized: pastikan hanya satu thread yang bisa masuk blok ini sekaligus
+                // Mencegah race condition saat dua coroutine minta database bersamaan
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "perkapp_database" // Nama file SQLite di penyimpanan internal HP
+                )
+                    .addMigrations(MIGRATION_1_2, MIGRATION_7_8, MIGRATION_8_9) // instruksi upgrade skema antar versi
+                    .fallbackToDestructiveMigration() // jika gagal migrasi, hapus data lama & buat tabel baru dari nol
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}

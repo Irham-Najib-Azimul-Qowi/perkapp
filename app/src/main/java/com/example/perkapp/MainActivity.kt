@@ -27,14 +27,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
-import com.example.perkapp.core.network.RetrofitClient
-import com.example.perkapp.core.sync.SyncManager
-import com.example.perkapp.core.ui.theme.PerkappTheme
+import com.example.perkapp.network.RetrofitClient
+import com.example.perkapp.sync.SyncManager
+import com.example.perkapp.ui.theme.PerkappTheme
 import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 
-import com.example.perkapp.core.datastore.UserPreferences
-import com.example.perkapp.core.datastore.dataStore
+import com.example.perkapp.database.UserPreferences
+import com.example.perkapp.database.dataStore
 import kotlinx.coroutines.flow.first
 
 /**
@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
             val token = userPrefs.getAuthToken.first() // first() menunggu hingga nilai pertama terbaca
             
             // Cek kondisi login dan jaringan
-            if (!token.isNullOrBlank() && com.example.perkapp.core.utils.NetworkUtils.isOnline(applicationContext)) {
+            if (!token.isNullOrBlank() && com.example.perkapp.util.NetworkUtils.isOnline(applicationContext)) {
                 // Mendorong data lokal (Room) ke server (API) secara langsung di awal
                 SyncManager.syncNow(applicationContext)
             }
